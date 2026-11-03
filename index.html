@@ -2056,7 +2056,7 @@ window.FLEXKIN_SESSION = {
       fx = planStep(e, Math.max(0, session.lines[session.i].group - 1));
       fx.hands = CHOREO[e.type] || null; fx.T = stepSeconds();
       const p = CATALOG[session.lines[session.i].product] || {};
-      showProduct(fx.hands ? null : fx.L.thick ? (p.thumb || p.image) : p.image);   // with hands, the product stays in the caption
+      showProduct(fx.L.thick ? (p.thumb || p.image) : p.image);
     }
     const L = fx.L;
     if (!session.paused) session.effectT += dt;
@@ -2066,8 +2066,18 @@ window.FLEXKIN_SESSION = {
     effMat.roughness = L.rough; effMat.clearcoat = L.coat;
     if (fx.hands){
       effMat.roughness = .22; effMat.clearcoat = .6;
-      hideTools(dt); av.sparks.forEach(sp=>sp.material.opacity = 0);
+      fallSprites.forEach(sp=>sp.material.opacity = 0); av.sparks.forEach(sp=>sp.material.opacity = 0);
       handsStep(session.paused ? 0 : dt, s);
+      // the product being applied: beside the head, tipping over each spot as it is dotted on
+      av.face.getWorldPosition(fTmp); camR.setFromMatrixColumn(camera.matrixWorld, 0);
+      const u = s / Math.max(6, fx.T - .6), dot = fx.hands.moves.find(m=>m.p && m.p.k === 'dab' && u > m.u[0] - .03 && u < m.u[1]);
+      let tilt = -.15;
+      if (dot){ const [px, py] = dot.h === 'L' ? HM(dot.path)[0] : dot.path[0]; facePoint(px, py, pA); pA.y += .15; tilt = -.9; }
+      else pA.copy(fTmp).addScaledVector(camR, .22).add(new THREE.Vector3(0, .16 + (reduce ? 0 : Math.sin(s * 2.2) * .008), 0));   // stays inside a phone frame
+      if (prodSprite.material.opacity < .05) prodSprite.position.copy(pA);
+      prodSprite.position.lerp(pA, Math.min(1, dt * 4));
+      prodSprite.material.rotation += (tilt - prodSprite.material.rotation) * Math.min(1, dt * 5);
+      prodSprite.material.opacity = prodSprite.material.map ? Math.min(1, s * 2) : 0;
       return;
     }
     hideHands(dt);
