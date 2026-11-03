@@ -902,16 +902,20 @@ window.FLEXKIN_SESSION = {
   const loungeFill = new THREE.PointLight(0xffe0c0, .45, 3.2, 2); loungeFill.position.set(0, 1.8, 1.2); scene.add(loungeFill);
 
   /* =========================================================
-     Guest avatars: cute spa guests in white shawl-collar robes
+     Guest avatars: small, round spa guests in white robes.
+     Big head, short body, stubby limbs; faces change with the visit:
+     neutral in the lounge → sad with the skin concern on the bed →
+     eyes closed during care → smiling with glowing skin afterwards.
      ========================================================= */
-  const skin = new THREE.MeshPhysicalMaterial({color:0xf8d9c6, roughness:.6, sheen:new THREE.Color(0x553322), envMapIntensity:.4});
+  const skin = new THREE.MeshPhysicalMaterial({color:0xf8d9c6, roughness:.6, sheen:new THREE.Color(0x553322), envMapIntensity:.4, clearcoat:0, clearcoatRoughness:.2});
   const robe = new THREE.MeshPhysicalMaterial({...terrySet, color:0xffffff, sheen:new THREE.Color(0x9a9690), envMapIntensity:.35});
   const robeTrim = new THREE.MeshPhysicalMaterial({...terrySet, color:0xf2eee8, sheen:new THREE.Color(0x9a9690)});
   const dark = new THREE.MeshStandardMaterial({color:0x1a1210, roughness:.3});
   const navy = new THREE.MeshStandardMaterial({color:0x1b2a4a, roughness:.5});
   const innerTop = new THREE.MeshStandardMaterial({color:0xf3c9c4, roughness:.8});
   const mouthMat = new THREE.MeshStandardMaterial({color:0x9c4a45, roughness:.6});
-  const blushMat = new THREE.MeshBasicMaterial({color:0xff8f8f, transparent:true, opacity:.35, depthWrite:false});
+  const mouthIn = new THREE.MeshStandardMaterial({color:0x7a2f32, roughness:.7, side:THREE.DoubleSide});
+  const noseMat = new THREE.MeshStandardMaterial({color:0xe9b9a3, roughness:.6});
   const shineMat = new THREE.MeshBasicMaterial({color:0xffffff});
   const HAIR = [0x3b2619, 0x1c1512, 0x6b4426, 0x8a5a3a, 0x2e2a35, 0xb88a5e].map(c=>new THREE.MeshPhysicalMaterial({color:c, roughness:.45, clearcoat:.3, clearcoatRoughness:.5, envMapIntensity:.7}));
   const CARE_LIST = (window.FLEXKIN_CARE || []).filter(c=>c && c.key && Array.isArray(c.steps));
@@ -923,80 +927,164 @@ window.FLEXKIN_SESSION = {
   const sparkTex = canvasTex(64, 64, (c,w,h)=>{ const g = c.createRadialGradient(32,32,0,32,32,32); g.addColorStop(0,'rgba(255,255,255,1)'); g.addColorStop(.25,'rgba(255,255,255,.6)'); g.addColorStop(1,'rgba(255,255,255,0)'); c.fillStyle=g; c.fillRect(0,0,w,h);
     c.fillStyle='rgba(255,255,255,.9)'; c.fillRect(30,4,4,56); c.fillRect(4,30,56,4); });
 
-  const robePts = [[.0,.22],[.2,.22],[.215,.25],[.205,.36],[.19,.48],[.185,.56],[.2,.64],[.2,.7],[.17,.76],[.11,.795],[.0,.8]].map(p=>new THREE.Vector2(p[0],p[1]));
+  /* ---------- skin concern drawn on the face (same layout as the care layer) ---------- */
+  const IX = 256, I_EYE = [[.312*IX, .51*IX], [.688*IX, .51*IX]], I_LIPS = [.5*IX, .73*IX];
+  function issueCanvas(draw){
+    const c = document.createElement('canvas'); c.width = c.height = IX; const x = c.getContext('2d');
+    draw(x);
+    // soft oval edge, keep eyes and lips clean
+    x.globalCompositeOperation = 'destination-in';
+    const g = x.createRadialGradient(IX/2, IX/2, IX*.28, IX/2, IX/2, IX*.48); g.addColorStop(0, '#fff'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.fillRect(0, 0, IX, IX);
+    x.globalCompositeOperation = 'destination-out';
+    for (const [ex, ey] of I_EYE){ x.beginPath(); x.ellipse(ex, ey, 15, 14, 0, 0, Math.PI*2); x.fill(); }
+    x.beginPath(); x.ellipse(I_LIPS[0], I_LIPS[1], 18, 9, 0, 0, Math.PI*2); x.fill();
+    const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.userData = { canvas: c }; return t;
+  }
+  const rr = (a, b) => a + Math.random() * (b - a);
+  const blob = (x, cx, cy, r, col) => { const g = x.createRadialGradient(cx, cy, 0, cx, cy, r); g.addColorStop(0, col); g.addColorStop(1, col.replace(/[\d.]+\)$/, '0)')); x.fillStyle = g; x.beginPath(); x.arc(cx, cy, r, 0, Math.PI*2); x.fill(); };
+  const ISSUE = {
+    // 건조하고 당겨요: dull, flaky patches and fine dry lines
+    glass: issueCanvas(x=>{
+      for (const [cx, cy, r] of [[.27,.62,.16],[.73,.62,.16],[.5,.2,.2],[.5,.88,.1]]) blob(x, cx*IX, cy*IX, r*IX, 'rgba(226,206,194,.85)');
+      x.fillStyle = 'rgba(250,246,240,.95)';
+      for (let i=0;i<95;i++){ const side = i % 3, cx = (side === 0 ? .27 : side === 1 ? .73 : .5)*IX + rr(-28, 28), cy = (side === 2 ? .2 : .62)*IX + rr(-22, 22);
+        x.beginPath(); x.moveTo(cx, cy); for (let k=0;k<4;k++) x.lineTo(cx + rr(-4, 4), cy + rr(-3, 3)); x.closePath(); x.fill(); }
+      x.strokeStyle = 'rgba(150,112,96,.75)'; x.lineWidth = 1.2;
+      for (let i=0;i<26;i++){ const cx = (i % 2 ? .73 : .27)*IX + rr(-24, 24), cy = .62*IX + rr(-18, 18); x.beginPath(); x.moveTo(cx, cy); x.lineTo(cx + rr(6, 12), cy + rr(-3, 3)); x.stroke(); }
+    }),
+    // 피부가 쉽게 붉어져요: flushed cheeks, nose and chin
+    soothing: issueCanvas(x=>{
+      for (const [cx, cy, r, a] of [[.26,.63,.17,.75],[.74,.63,.17,.75],[.5,.55,.08,.55],[.5,.87,.09,.45],[.5,.22,.13,.3]]) blob(x, cx*IX, cy*IX, r*IX, `rgba(226,92,92,${a})`);
+      for (let i=0;i<40;i++){ const cx = (i % 2 ? .74 : .26)*IX + rr(-30, 30), cy = .63*IX + rr(-24, 24); blob(x, cx, cy, rr(2, 4), 'rgba(205,60,64,.8)'); }
+    }),
+    // 맑아지고 싶어요: dull grey veil with pigment spots
+    bright: issueCanvas(x=>{
+      x.fillStyle = 'rgba(160,138,120,.28)'; x.fillRect(0, 0, IX, IX);
+      for (let i=0;i<34;i++){ const cx = rr(.2, .8)*IX, cy = rr(.4, .72)*IX;
+        if (Math.hypot(cx - I_LIPS[0], cy - I_LIPS[1]) < 26) continue;
+        blob(x, cx, cy, rr(2, 4.5), `rgba(140,92,62,${rr(.4, .65)})`); }
+      blob(x, .3*IX, .58*IX, .08*IX, 'rgba(120,85,60,.35)'); blob(x, .7*IX, .58*IX, .08*IX, 'rgba(120,85,60,.35)');
+    }),
+    // 탄력이 걱정돼요: forehead lines, crow's feet, smile lines and soft sagging shadows
+    firm: issueCanvas(x=>{
+      x.strokeStyle = 'rgba(140,92,72,.7)'; x.lineWidth = 2; x.lineCap = 'round';
+      for (let i=0;i<3;i++){ const y = (.14 + i*.055)*IX; x.beginPath(); x.moveTo(.3*IX, y + 4); x.quadraticCurveTo(.5*IX, y - 5, .7*IX, y + 4); x.stroke(); }
+      for (const [ex, ey] of I_EYE){ const s = ex < IX/2 ? -1 : 1;
+        for (let k=-1;k<=1;k++){ x.beginPath(); x.moveTo(ex + s*20, ey + k*5); x.lineTo(ex + s*32, ey + k*10); x.stroke(); }
+        x.beginPath(); x.moveTo(ex - 12, ey + 18); x.quadraticCurveTo(ex, ey + 25, ex + 12, ey + 18); x.stroke(); }
+      x.lineWidth = 2.6;
+      for (const s of [-1, 1]){ x.beginPath(); x.moveTo(IX/2 + s*.09*IX, .6*IX); x.quadraticCurveTo(IX/2 + s*.15*IX, .7*IX, IX/2 + s*.1*IX, .8*IX); x.stroke(); }
+      blob(x, .27*IX, .8*IX, .12*IX, 'rgba(120,80,64,.35)'); blob(x, .73*IX, .8*IX, .12*IX, 'rgba(120,80,64,.35)');
+    }),
+  };
+
+  const robePts = [[0,.1],[.17,.1],[.185,.13],[.182,.21],[.172,.3],[.172,.38],[.165,.44],[.13,.49],[.08,.51],[0,.515]].map(p=>new THREE.Vector2(p[0],p[1]));
   const G = {
-    slipper: roundedBox(.12,.055,.21,.04,3), leg: new THREE.CylinderGeometry(.04,.045,.2,16),
+    slipper: roundedBox(.1,.05,.17,.035,3), leg: new THREE.CylinderGeometry(.038,.042,.1,14),
     robe: new THREE.LatheGeometry(robePts, 40),
     collar: new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
-      new THREE.Vector3(.015,.5,.162), new THREE.Vector3(.07,.62,.16), new THREE.Vector3(.11,.74,.11), new THREE.Vector3(.09,.8,.0), new THREE.Vector3(0,.82,-.07),
-      new THREE.Vector3(-.09,.8,.0), new THREE.Vector3(-.11,.74,.11), new THREE.Vector3(-.07,.62,.16), new THREE.Vector3(-.015,.5,.162)]), 56, .028, 10, false),
-    vneck: (()=>{ const s = new THREE.Shape(); s.moveTo(0,.52); s.lineTo(.085,.73); s.lineTo(-.085,.73); s.closePath(); return new THREE.ShapeGeometry(s); })(),
-    belt: new THREE.TorusGeometry(.193, .016, 10, 40), loop: new THREE.TorusGeometry(.03,.011,8,20),
-    tail1: new THREE.BoxGeometry(.022,.13,.012), tail2: new THREE.BoxGeometry(.022,.11,.012),
-    pocket: roundedBox(.07,.008,.06,.01,2), diamond: new THREE.BoxGeometry(.016,.016,.004),
-    sleeve: new THREE.CylinderGeometry(.05,.065,.24,18), cuff: new THREE.TorusGeometry(.064,.016,10,22), hand: new THREE.SphereGeometry(.042,18,12),
+      new THREE.Vector3(.012,.3,.15), new THREE.Vector3(.06,.38,.148), new THREE.Vector3(.095,.45,.11), new THREE.Vector3(.08,.5,.0), new THREE.Vector3(0,.515,-.06),
+      new THREE.Vector3(-.08,.5,.0), new THREE.Vector3(-.095,.45,.11), new THREE.Vector3(-.06,.38,.148), new THREE.Vector3(-.012,.3,.15)]), 56, .024, 10, false),
+    vneck: (()=>{ const s = new THREE.Shape(); s.moveTo(0,.31); s.lineTo(.07,.46); s.lineTo(-.07,.46); s.closePath(); return new THREE.ShapeGeometry(s); })(),
+    belt: new THREE.TorusGeometry(.172, .015, 10, 40), loop: new THREE.TorusGeometry(.026,.01,8,20),
+    tail1: new THREE.BoxGeometry(.02,.1,.011), tail2: new THREE.BoxGeometry(.02,.085,.011),
+    pocket: roundedBox(.06,.007,.05,.01,2), diamond: new THREE.BoxGeometry(.014,.014,.004),
+    sleeve: new THREE.CylinderGeometry(.045,.056,.14,18), cuff: new THREE.TorusGeometry(.055,.014,10,22), hand: new THREE.SphereGeometry(.042,18,12),
     neck: new THREE.CylinderGeometry(.045,.05,.06,14), face: new THREE.SphereGeometry(.2, 40, 28), ear: new THREE.SphereGeometry(.035,14,10),
     cap: new THREE.SphereGeometry(.212, 40, 28, 0, Math.PI*2, 0, Math.PI*.56),
     bangs: new THREE.SphereGeometry(.209, 40, 10, Math.PI*.18, Math.PI*.64, Math.PI*.32, Math.PI*.15),
     bun: new THREE.SphereGeometry(.085, 28, 20), scrunchie: new THREE.TorusGeometry(.06,.022,10,22),
-    eye: new THREE.SphereGeometry(.026, 20, 14), shine: new THREE.SphereGeometry(.008, 8, 6),
-    lid: new THREE.TorusGeometry(.022, .005, 8, 18, Math.PI), blush: new THREE.CircleGeometry(.03, 20),
-    mouth: new THREE.TorusGeometry(.022, .0055, 8, 20, Math.PI),
+    eye: new THREE.SphereGeometry(.026, 20, 14), shine: new THREE.SphereGeometry(.009, 8, 6), shine2: new THREE.SphereGeometry(.0045, 6, 5),
+    lid: new THREE.TorusGeometry(.022, .005, 8, 18, Math.PI), blush: new THREE.CircleGeometry(.032, 20),
+    brow: THREE.CapsuleGeometry ? new THREE.CapsuleGeometry(.0045, .032, 4, 8) : new THREE.CylinderGeometry(.0045, .0045, .04, 8),
+    nose: new THREE.SphereGeometry(.011, 10, 8),
+    mouth: new THREE.TorusGeometry(.02, .0055, 8, 20, Math.PI), grin: new THREE.CircleGeometry(.03, 24, Math.PI, Math.PI),
     pack: new THREE.SphereGeometry(.207, 36, 16, Math.PI*.2, Math.PI*.6, Math.PI*.3, Math.PI*.42),
+    issue: new THREE.SphereGeometry(.2035, 36, 16, Math.PI*.2, Math.PI*.6, Math.PI*.3, Math.PI*.42),
   };
+  const HEAD_SCALE = 1.18, HEAD_Y = .5;          // big round head on a short body
+  const FACE_UP = HEAD_Y + .2 * HEAD_SCALE;      // height of the face centre above the feet (.736)
 
   function makeAvatar(look){
     const ch = new THREE.Group(); scene.add(ch);
     const body = new THREE.Group(); ch.add(body);
+    const skinMat = skin.clone();                // per guest, so the after-care glow is theirs alone
     const P = {parent:body};
-    [-1,1].forEach(s=>{ add(G.slipper, robe, s*.075, .0265, .03, P); add(G.leg, skin, s*.07, .14, 0, P); });
-    add(G.robe, robe, 0, 0, 0, P).scale.z = .82;
+    [-1,1].forEach(s=>{ add(G.slipper, robe, s*.065, .025, .02, P); add(G.leg, skinMat, s*.06, .08, 0, P); });
+    add(G.robe, robe, 0, 0, 0, P).scale.z = .85;
     add(G.collar, robeTrim, 0, 0, 0, P);
-    add(G.vneck, innerTop, 0, 0, .166, {parent:body, cast:false});
-    add(G.belt, robeTrim, 0, .47, 0, {rx:Math.PI/2, parent:body}).scale.y = .82;
-    [-1,1].forEach(s=>add(G.loop, robeTrim, .07+s*.03, .47, .165, {rz:s*.5, parent:body}).scale.set(1.3,.8,.6));
-    add(G.tail1, robeTrim, .055, .4, .165, {rz:.12, parent:body});
-    add(G.tail2, robeTrim, .085, .41, .162, {rz:-.15, parent:body});
-    add(G.pocket, robeTrim, -.1, .63, .158, {rx:Math.PI/2-.12, parent:body});
-    add(G.diamond, navy, -.1, .64, .166, {rz:Math.PI/4, parent:body, cast:false});
-    const arm = s => { const sh = new THREE.Group(); sh.position.set(s*.17, .74, 0); body.add(sh);
-      add(G.sleeve, robe, 0, -.12, 0, {parent:sh}); add(G.cuff, robeTrim, 0, -.24, 0, {rx:Math.PI/2, parent:sh}); add(G.hand, skin, 0, -.28, 0, {parent:sh});
-      sh.rotation.z = s*.32; sh.rotation.x = -.12; return sh; };
+    add(G.vneck, innerTop, 0, 0, .152, {parent:body, cast:false});
+    add(G.belt, robeTrim, 0, .3, 0, {rx:Math.PI/2, parent:body}).scale.y = .85;
+    [-1,1].forEach(s=>add(G.loop, robeTrim, .06+s*.026, .3, .148, {rz:s*.5, parent:body}).scale.set(1.3,.8,.6));
+    add(G.tail1, robeTrim, .048, .245, .148, {rz:.12, parent:body});
+    add(G.tail2, robeTrim, .074, .25, .146, {rz:-.15, parent:body});
+    add(G.pocket, robeTrim, -.085, .4, .142, {rx:Math.PI/2-.12, parent:body});
+    add(G.diamond, navy, -.085, .408, .149, {rz:Math.PI/4, parent:body, cast:false});
+    const arm = s => { const sh = new THREE.Group(); sh.position.set(s*.15, .46, 0); body.add(sh);
+      add(G.sleeve, robe, 0, -.07, 0, {parent:sh}); add(G.cuff, robeTrim, 0, -.14, 0, {rx:Math.PI/2, parent:sh}); add(G.hand, skinMat, 0, -.175, 0, {parent:sh});
+      sh.rotation.z = s*.35; sh.rotation.x = -.1; return sh; };
     const armL = arm(-1), armR = arm(1);
-    const head = new THREE.Group(); head.position.set(0, .82, 0); body.add(head);
+    const head = new THREE.Group(); head.position.set(0, HEAD_Y, 0); head.scale.setScalar(HEAD_SCALE); body.add(head);
     const H = {parent:head};
-    add(G.neck, skin, 0, .02, 0, H);
-    const face = add(G.face, skin, 0, .2, 0, H); face.scale.set(1, .95, .95);
-    [-1,1].forEach(s=>add(G.ear, skin, s*.195, .19, 0, H));
+    add(G.neck, skinMat, 0, .02, 0, H);
+    const face = add(G.face, skinMat, 0, .2, 0, H); face.scale.set(1, .95, .95);
+    [-1,1].forEach(s=>add(G.ear, skinMat, s*.195, .19, 0, H));
     const hair = HAIR[look.h % HAIR.length];
     add(G.cap, hair, 0, .21, -.006, {rx:-.38, parent:head});
     add(G.bangs, hair, 0, .212, .006, H);
     add(G.bun, hair, 0, .42, -.06, H);
     add(G.scrunchie, robeTrim, 0, .37, -.05, {rx:Math.PI/2+.3, parent:head});
-    const eyes = [], open = [], closed = [];
+    // the skin concern sits just above the skin, under the care layer
+    const issueMat = new THREE.MeshStandardMaterial({ transparent:true, opacity:0, depthWrite:false, roughness:.7, polygonOffset:true, polygonOffsetFactor:-1 });
+    const issue = add(G.issue, issueMat, 0, .2, 0, {parent:head, cast:false}); issue.scale.set(1, .95, .95); issue.visible = false;
+    // face parts
+    const eyes = [], open = [], closed = [], happy = [], brows = [], blush = [];
     [-1,1].forEach(s=>{
-      const e = add(G.eye, dark, s*.072, .19, .178, {parent:head, cast:false}); e.scale.set(.85, 1.15, .5); eyes.push(e);
-      open.push(e, add(G.shine, shineMat, s*.072 + .008, .2, .19, {parent:head, cast:false}));
-      const c = add(G.lid, dark, s*.072, .195, .186, {rz:Math.PI, parent:head, cast:false}); c.visible = false; closed.push(c);
-      add(G.blush, blushMat, s*.115, .14, .176, {ry:s*.55, parent:head, cast:false});
+      const e = add(G.eye, dark, s*.072, .19, .178, {parent:head, cast:false}); e.scale.set(1.0, 1.35, .5); eyes.push(e);
+      open.push(e, add(G.shine, shineMat, s*.072 + .009, .203, .192, {parent:head, cast:false}), add(G.shine2, shineMat, s*.072 - .006, .178, .19, {parent:head, cast:false}));
+      const c = add(G.lid, dark, s*.072, .19, .186, {rz:Math.PI, parent:head, cast:false}); c.visible = false; c.userData.side = s; closed.push(c);
+      const h = add(G.lid, dark, s*.072, .186, .187, {parent:head, cast:false}); h.visible = false; happy.push(h);
+      const b = add(G.brow, hair, s*.074, .25, .196, {rz:Math.PI/2, parent:head, cast:false}); b.userData.side = s; brows.push(b);
+      const bl = add(G.blush, new THREE.MeshBasicMaterial({color:0xff8f8f, transparent:true, opacity:.35, depthWrite:false}), s*.118, .145, .174, {ry:s*.55, parent:head, cast:false}); blush.push(bl);
     });
-    add(G.mouth, mouthMat, 0, .135, .19, {rz:Math.PI, parent:head, cast:false});
+    add(G.nose, noseMat, 0, .16, .197, {parent:head, cast:false});
+    const mSmile = add(G.mouth, mouthMat, 0, .128, .19, {rz:Math.PI, parent:head, cast:false});
+    const mSad = add(G.mouth, mouthMat, 0, .112, .191, {parent:head, cast:false}); mSad.scale.set(.8, .6, 1); mSad.visible = false;
+    const mGrin = add(G.grin, mouthIn, 0, .135, .193, {parent:head, cast:false}); mGrin.visible = false;
     const pack = add(G.pack, packMats.glass, 0, .2, 0, {parent:head, cast:false}); pack.scale.set(1, .95, .95); pack.visible = false;
     ch.traverse(o=>{ if (o.isMesh) o.castShadow = true; });
     const sparks = [0,1,2,3,4,5].map(()=>{ const s = new THREE.Sprite(new THREE.SpriteMaterial({map:sparkTex, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, opacity:0})); scene.add(s); return s; });
     const feet = new THREE.Group(); scene.add(feet);
-    const feetAO = [contact(.6, .5, 0, .02, feet, 1), contact(.17, .28, -.075, .03, feet, .9), contact(.17, .28, .075, .03, feet, .9)];
+    const feetAO = [contact(.5, .42, 0, .02, feet, 1), contact(.14, .24, -.065, .02, feet, .9), contact(.14, .24, .065, .02, feet, .9)];
     const tagEl = document.createElement('div'); tagEl.className = 'tag'; tagEl.hidden = true;
     tagEl.append(document.createElement('b'), document.createElement('span')); document.getElementById('tags').append(tagEl);
-    const av = { ch, body, head, face, armL, armR, eyes, open, closed, pack, sparks, feet, feetAO, tagEl,
-      from:null, to:null, t0:0, lie:0, bowT:-10, waveT:-10, nextBlink:2+Math.random()*3, seed:Math.random()*10, care:null };
+    const av = { ch, body, head, face, armL, armR, eyes, open, closed, happy, brows, blush, mSmile, mSad, mGrin, issue, issueMat, skinMat, pack, sparks, feet, feetAO, tagEl,
+      from:null, to:null, t0:0, lie:0, bowT:-10, waveT:-10, nextBlink:2+Math.random()*3, seed:Math.random()*10, care:null, glow:0, issueK:0, issueKey:null, expr:null };
     av.dispose = () => { scene.remove(ch, feet); sparks.forEach(s=>scene.remove(s)); tagEl.remove(); };
     return av;
   }
 
+  // expressions: 'neutral' | 'sad' | 'happy'; eyesClosed for lying through care
+  function setExpression(av, expr, eyesClosed){
+    const key = expr + (eyesClosed ? '-z' : '');
+    if (av.expr === key) return; av.expr = key;
+    const happy = expr === 'happy', sad = expr === 'sad';
+    av.open.forEach(o=>o.visible = !eyesClosed && !happy);
+    av.closed.forEach(o=>{ o.visible = eyesClosed && !happy; o.rotation.z = Math.PI + (sad ? -o.userData.side * .3 : 0); });
+    av.happy.forEach(o=>o.visible = happy);
+    av.brows.forEach(b=>{ const s = b.userData.side; b.rotation.z = Math.PI/2 + (sad ? -s * .45 : happy ? s * .12 : 0); b.position.y = sad ? .243 : happy ? .258 : .25; });
+    av.mSmile.visible = expr === 'neutral'; av.mSad.visible = sad; av.mGrin.visible = happy;
+    av.blush.forEach(b=>{ b.material.opacity = happy ? .6 : sad ? .18 : .35; b.scale.setScalar(happy ? 1.25 : 1); });
+    av.eyes.forEach(e=>e.scale.set(1, sad ? 1.1 : 1.35, .5));
+  }
+
   /* ---------- poses ---------- */
   const qLie = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI/2, 0, 0));   // head toward the headrest, face up
-  function bedPose(b){ return { key:'b'+b, pos:new THREE.Vector3(beds[b].x, .875, BED_Z + .42), quat:qLie.clone(), lie:1 }; }
+  // lying: face centre over the headrest; the head tilts up a little on the pillow (see animateAvatar)
+  function bedPose(b){ return { key:'b'+b, pos:new THREE.Vector3(beds[b].x, .88, BED_Z - .58 + FACE_UP), quat:qLie.clone(), lie:1 }; }
+  // arriving guest: stands a little way from the bed, back to the camera, looking at it
+  function entryPose(){ return { key:'entry', pos:new THREE.Vector3(.2, 0, -.25), quat:new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI - .12, 0)), lie:0 }; }   // just in front of the bed foot
   // waiting spots around the bed, all inside the opening view
   // first four are fully in frame on every screen size and never cover the lying customer; the rest are overflow
   const LOUNGE = [[.75,-.65],[-.75,-1.1],[.75,-1.7],[0,-.2],[-1.5,-.4],[1.5,-.3],[-.5,.35],[.6,.4],[-1.6,-1.6],[1.65,-1.95]];
@@ -1025,7 +1113,7 @@ window.FLEXKIN_SESSION = {
   const two = n => String(n+1).padStart(2,'0');
   const nameOf = s => (int(s.a, ADJ.length) !== null && int(s.b, ANI.length) !== null) ? `${ADJ[s.a]} ${ANI[s.b]} 고객님` : '고객님';
 
-  const me = { a:rnd(ADJ.length), b:rnd(ANI.length), h:rnd(HAIR.length), r:0, bed:0, at:Date.now(), care:null };   // the customer arrives lying on the bed
+  const me = { a:rnd(ADJ.length), b:rnd(ANI.length), h:rnd(HAIR.length), r:0, bed:-1, at:0, care:null, glow:false, hasLain:false };   // arrives standing, back to the camera
   const all = new Map();                 // everyone in the building: key -> {key, state, isMe}
   all.set('me', { key:'me', state:me, isMe:true });
   const avs = new Map();                 // avatars drawn in MY room: key -> avatar
@@ -1033,11 +1121,11 @@ window.FLEXKIN_SESSION = {
 
   let room = null, myPeer = 'me', userActed = false, arrived = false;
   setTimeout(()=>{ arrived = true; }, 5000);
-  function pushPresence(){ if (room) room.presence({ a:me.a, b:me.b, h:me.h, r:me.r, bed:me.bed, at:me.at, care:me.care }).catch(()=>{}); }
+  function pushPresence(){ if (room) room.presence({ a:me.a, b:me.b, h:me.h, r:me.r, bed:me.bed, at:me.at, care:me.care, glow:me.glow ? 1 : 0 }).catch(()=>{}); }
   function cleanState(p){
     return { a:int(p.a, ADJ.length), b:int(p.b, ANI.length), h:int(p.h, HAIR.length) ?? 0, r:int(p.r, ROOMS) ?? 0,
       bed: p.bed === 0 ? 0 : -1, at: Number.isFinite(p.at) ? p.at : 0,
-      care: (typeof p.care === 'string' && CARES[p.care]) ? p.care : null };
+      care: (typeof p.care === 'string' && CARES[p.care]) ? p.care : null, glow: p.glow === 1 };
   }
 
   // one guest per room's bed: the earliest claim wins
@@ -1102,7 +1190,7 @@ window.FLEXKIN_SESSION = {
       flash.textContent = `관리실 ${two(n)}`; flash.classList.remove('go'); void flash.offsetWidth; flash.classList.add('go');
       drawPlate(n);
       meAv.to = null;                                   // arrive at the lounge, then walk on
-      setTarget(meAv, lie ? bedPose(0) : standPose(0), clock.getElapsedTime());
+      setTarget(meAv, lie ? bedPose(0) : me.hasLain ? standPose(0) : entryPose(), clock.getElapsedTime());
     }
     computeOccupancy(); refreshAvatars(); pushPresence(); updateUI();
   }
@@ -1129,7 +1217,7 @@ window.FLEXKIN_SESSION = {
     careBtns.forEach(b=>b.setAttribute('aria-pressed', me.care === b.dataset.care));
     const taken = occ[me.r] && occ[me.r].entry !== 'me';
     hintEl.textContent = me.bed >= 0 ? (!lying ? '관리대로 이동하고 있어요' : '고민을 고르면 약 2~3분 동안 편안한 관리가 시작돼요')
-      : taken ? '이 방 관리대는 사용 중이에요 · 고민을 고르면 빈 관리실로 안내해 드려요' : '고민을 고르면 약 2~3분 동안 편안한 관리가 시작돼요';
+      : taken ? '이 방 관리대는 사용 중이에요 · 고민을 고르면 빈 관리실로 안내해 드려요' : '관리대를 누르면 누울 수 있어요 · 고민을 고르면 바로 관리가 시작돼요';
     document.getElementById('roomNo').textContent = two(me.r);
     document.getElementById('count').textContent = `${peopleIn(me.r)}명`;
   }
@@ -1172,6 +1260,15 @@ window.FLEXKIN_SESSION = {
   const audio = { ctx:null, master:null, on:true };
   try { audio.on = localStorage.getItem('flexkin-music') !== 'off'; } catch(e){}
   const sessionOwnsFace = () => !!(session && !session.ended);
+  // 0 → 1 across the care steps (the intro keeps the concern fully visible)
+  function sessionProgress(){
+    if (!session || session.i < 0) return 0;
+    const L = session.lines, steps = L.filter(l=>l.group >= 1 && l.group <= session.c.steps.length);
+    if (!steps.length) return 0;
+    const st = steps[0].start, en = steps[steps.length - 1].start + steps[steps.length - 1].dur;
+    const l = L[Math.min(session.i, L.length - 1)], now = l.start + Math.min(session.t, l.dur);
+    return Math.max(0, Math.min(1, (now - st) / (en - st)));
+  }
 
   const lineDur = t => Math.max(PACE.minLine, Math.min(PACE.maxLine, PACE.base + t.length * PACE.perChar));
   const sentences = t => (t.match(/[^.!?]+[.!?]+["')]?|[^.!?]+$/g) || [t]).map(x=>x.trim()).filter(Boolean);
@@ -1194,6 +1291,7 @@ window.FLEXKIN_SESSION = {
     const c = CARE_BY_KEY[key]; if (!c) return;
     if (session) stopTimers();
     const lines = buildLines(c);
+    me.glow = false; pushPresence();
     const groups = c.steps.length + 2;
     session = { key, c, lines, i:-1, t:0, total: lines.reduce((a,l)=>a + l.dur, 0), groups, paused:false, ended:false, finale:false,
       effect:null, effectT:0, timers:[] };
@@ -1231,6 +1329,7 @@ window.FLEXKIN_SESSION = {
   }
   function showFinale(){
     const c = session.c; session.finale = true; session.effect = null;
+    me.glow = true; pushPresence();                     // smile + glowing skin from here on
     capEl.hidden = true; playerEl.hidden = true;
     gid('fProg').textContent = `${c.program} · ${c.concern}`;
     gid('fTitle').textContent = SES.finaleTitle || '오늘의 FLEXKIN 관리가 완료되었습니다.';
@@ -1406,8 +1505,16 @@ window.FLEXKIN_SESSION = {
     const d = narrow ? 3.1 : 2.7, az = .45, target = new THREE.Vector3(0, .92, BED_Z + .05);
     return { target, pos: new THREE.Vector3(Math.sin(az) * d, target.y + (narrow ? 1.25 : 1.05), target.z + Math.cos(az) * d) };
   }
-  const HOME_VIEW = { get pos(){ return openingView().pos; }, get target(){ return openingView().target; } };
-  const FACE_VIEW = { pos: new THREE.Vector3(.42, 1.78, BED_Z - .02), target: new THREE.Vector3(0, .96, BED_Z - .55) };   // about 1 m from the face
+  const BED_VIEW = { get pos(){ return openingView().pos; }, get target(){ return openingView().target; } };
+  // arrival: from further back, the guest seen from behind, looking toward the bed
+  function entryView(){
+    const narrow = stage.clientWidth / Math.max(1, stage.clientHeight) < .8;
+    const d = narrow ? 4.2 : 3.9, az = .28, target = new THREE.Vector3(.05, .25, -.75);   // keeps the whole guest above the bottom panel
+    return { target, pos: new THREE.Vector3(Math.sin(az) * d, target.y + (narrow ? 1.7 : 1.5), target.z + Math.cos(az) * d) };
+  }
+  const ENTRY_VIEW = { get pos(){ return entryView().pos; }, get target(){ return entryView().target; } };
+  const HOME_VIEW = { get pos(){ return (me.bed >= 0 ? BED_VIEW : ENTRY_VIEW).pos; }, get target(){ return (me.bed >= 0 ? BED_VIEW : ENTRY_VIEW).target; } };
+  const FACE_VIEW = { pos: new THREE.Vector3(.42, 1.8, BED_Z + .03), target: new THREE.Vector3(0, .98, BED_Z - .5) };   // about 1 m from the face
   const DISPLAY_VIEW = { pos: new THREE.Vector3(-.15, 1.55, BED_Z + .65), target: new THREE.Vector3(-1.25, .95, -2.2) };
   let glide = null;
   function glideTo(v){ glide = reduce ? null : { pos:v.pos.clone(), target:v.target.clone(), life:0 }; if (reduce){ camera.position.copy(v.pos); controls.target.copy(v.target); } }
@@ -1508,7 +1615,7 @@ window.FLEXKIN_SESSION = {
   function faceEffect(dt){
     const av = meAv, e = session && !session.finale ? session.effect : null;
     if (!e || av.lie < .9){
-      if (sessionOwnsFace()){ av.pack.visible = false; av.sparks.forEach(sp=>sp.material.opacity = 0); brush.material.opacity = 0; }
+      if (sessionOwnsFace()){ av.pack.visible = false; brush.material.opacity = 0; if (!session.finale) av.sparks.forEach(sp=>sp.material.opacity = 0); }
       return;
     }
     const L = LOOK[e.type] || LOOK.gloss;
@@ -1685,7 +1792,8 @@ window.FLEXKIN_SESSION = {
     camera.updateProjectionMatrix();
   }
   addEventListener('resize', resize); resize();
-  const OPEN = openingView();
+  controls.maxDistance = 4.6;
+  const OPEN = entryView();
   camera.position.copy(OPEN.pos); controls.target.copy(OPEN.target);
   controls.update();
 
@@ -1694,7 +1802,7 @@ window.FLEXKIN_SESSION = {
   function animateAvatar(e, av, t, slot){
     const s = e.state;
     const onBed = s.bed >= 0 && occ[s.r] && occ[s.r].entry === e.key;
-    setTarget(av, onBed ? bedPose(0) : standPose(slot), t);
+    setTarget(av, onBed ? bedPose(0) : (e.isMe && !me.hasLain) ? entryPose() : standPose(slot), t);
     const p = Math.min(1, (t - av.t0)/MOVE), k = p < .5 ? 2*p*p : 1 - Math.pow(-2*p+2, 2)/2;
     av.ch.position.lerpVectors(av.from.pos, av.to.pos, k);
     if (Math.abs(av.from.lie - av.to.lie) > .01) av.ch.position.y += Math.sin(k*Math.PI)*.28;
@@ -1704,14 +1812,32 @@ window.FLEXKIN_SESSION = {
     av.feet.rotation.y = av.to.lie ? 0 : new THREE.Euler().setFromQuaternion(av.to.quat).y;
     const fo = 1 - Math.min(1, av.lie*3) - (p < 1 && !av.to.lie ? Math.sin(k*Math.PI)*.5 : 0);
     av.feetAO.forEach((m,i)=>m.material.opacity = Math.max(0, fo) * (i ? .9 : 1));
-    const closedEyes = av.lie > .6;
-    av.open.forEach(o=>o.visible = !closedEyes); av.closed.forEach(o=>o.visible = closedEyes);
-    if (!closedEyes && t > av.nextBlink){ const b = (t - av.nextBlink)/.14, sc = b < 1 ? 1 - Math.sin(b*Math.PI)*.9 : 1; av.eyes.forEach(o=>o.scale.y = 1.15*sc); if (b >= 1) av.nextBlink = t + 2.5 + Math.random()*3; }
+    // face: neutral in the lounge, sad on the bed, eyes shut during care, smiling and glowing afterwards
+    const inCare = e.isMe ? !!(session && !session.ended && !session.finale) : (onBed && !!s.care && !s.glow);
+    const glowT = (e.isMe ? me.glow : s.glow) ? 1 : 0;
+    av.glow += (glowT - av.glow) * (reduce ? 1 : .03);
+    const expr = av.glow > .5 ? 'happy' : av.lie > .6 ? 'sad' : 'neutral';
+    setExpression(av, expr, expr === 'sad' && inCare);
+    const closedEyes = expr === 'happy' || (expr === 'sad' && inCare);
+    const eyeH = expr === 'sad' ? 1.1 : 1.35;
+    if (!closedEyes && t > av.nextBlink){ const b = (t - av.nextBlink)/.14, sc = b < 1 ? 1 - Math.sin(b*Math.PI)*.9 : 1; av.eyes.forEach(o=>o.scale.y = eyeH*sc); if (b >= 1) av.nextBlink = t + 2.5 + Math.random()*3; }
+    // skin concern: full on the bed, fading as the steps go by, gone once the care is done
+    let issueKey = null, issueT = 0;
+    if (e.isMe){ if (me.bed >= 0 && me.care && !me.glow){ issueKey = me.care; issueT = inCare ? 1 - sessionProgress() : 1; } }
+    else if (onBed && s.care && !s.glow){ issueKey = s.care; issueT = .85; }
+    if (issueKey && ISSUE[issueKey] && av.issueKey !== issueKey){ av.issueMat.map = ISSUE[issueKey]; av.issueMat.needsUpdate = true; av.issueKey = issueKey; }
+    av.issueK += ((issueKey && av.lie > .5 ? issueT : 0) - av.issueK) * (reduce ? 1 : .04);
+    av.issue.visible = av.issueK > .01; av.issueMat.opacity = av.issueK;
+    // after-care skin: dewy clearcoat and a warm inner light
+    av.skinMat.clearcoat = av.glow; av.skinMat.roughness = .6 - .32 * av.glow;
+    av.skinMat.emissive.setRGB(.09 * av.glow, .05 * av.glow, .035 * av.glow);
     const br = Math.sin(t*(closedEyes ? .9 : 1.6) + av.seed);
     av.body.scale.set(1 + br*(closedEyes ? .012 : .006), 1, 1 + br*(closedEyes ? .018 : .006));
     tmp.copy(camera.position); av.ch.worldToLocal(tmp);
-    const lim = closedEyes ? .4 : .6, yaw = Math.max(-lim, Math.min(lim, Math.atan2(tmp.x, tmp.z)));
+    const lim = av.lie > .6 ? .4 : .6, facingAway = av.to && av.to.key === 'entry';
+    const yaw = facingAway ? 0 : Math.max(-lim, Math.min(lim, Math.atan2(tmp.x, tmp.z)));
     av.head.rotation.y += (yaw - av.head.rotation.y)*.06;
+    av.head.rotation.x += ((av.lie > .5 ? .3 : 0) - av.head.rotation.x)*.08;   // head propped on the pillow
     av.head.rotation.z = reduce || closedEyes ? 0 : Math.sin(t*.7 + av.seed)*.06;
     const standing = av.lie < .05 && p >= 1;
     const bw = t - av.bowT, bowA = standing && bw >= 0 && bw < 1.2 ? Math.sin(bw/1.2*Math.PI)*.42 : 0;
@@ -1722,19 +1848,19 @@ window.FLEXKIN_SESSION = {
     else { av.armR.rotation.z += ((lying ? .12 : .32) - av.armR.rotation.z)*.1; av.armR.rotation.x += ((lying ? 0 : -.12) - av.armR.rotation.x)*.1; }
     av.armL.rotation.z += ((lying ? -.12 : -.32) - av.armL.rotation.z)*.1;
     av.armL.rotation.x += ((lying ? 0 : -.12) - av.armL.rotation.x)*.1;
-    const ownFace = av === meAv && sessionOwnsFace();
-    const care = !ownFace && onBed && av.lie > .95 ? s.care : null;
+    const ownFace = av === meAv && inCare;
+    const care = !e.isMe && inCare && av.lie > .95 ? s.care : null;
     if (!ownFace){ av.pack.visible = !!care; if (care) av.pack.material = packMats[care]; }
     av.face.getWorldPosition(tmp2);
     av.sparks.forEach((sp, i)=>{
       if (ownFace) return;
-      if (!care){ sp.material.opacity = 0; return; }
-      const c = ((t*.35 + i/av.sparks.length + av.seed) % 1);
-      sp.material.color.setHex(CARES[care].spark);
-      sp.material.opacity = (reduce ? .6 : Math.sin(c*Math.PI)) * .85;
-      const ang = i*1.05 + av.seed;
-      sp.position.set(tmp2.x + Math.cos(ang)*.16, tmp2.y + .12 + (reduce ? .1 : c*.32), tmp2.z + Math.sin(ang)*.12);
-      sp.scale.setScalar(.035 + Math.sin(c*Math.PI)*.03);
+      if (av.glow < .3){ sp.material.opacity = 0; return; }
+      // glints dancing on fresh, glowing skin
+      const c = ((t*.3 + i/av.sparks.length + av.seed) % 1), ang = i*1.05 + av.seed + t*.15;
+      sp.material.color.setHex(i % 2 ? 0xfff4dc : 0xffffff);
+      sp.material.opacity = (reduce ? .5 : Math.pow(Math.sin(c*Math.PI), 2)) * .95 * av.glow;
+      sp.position.set(tmp2.x + Math.cos(ang)*.2, tmp2.y + .05 + Math.sin(i*2.3)*.12, tmp2.z + Math.sin(ang)*.2);
+      sp.scale.setScalar(.04 + Math.sin(c*Math.PI)*.035);
     });
     tmp2.y += av.lie > .5 ? .4 : .36; tmp2.project(camera);
     const vis = tmp2.z < 1 && Math.abs(tmp2.x) < 1.05 && Math.abs(tmp2.y) < 1.05;
@@ -1742,7 +1868,8 @@ window.FLEXKIN_SESSION = {
     if (vis){
       av.tagEl.style.transform = `translate(${(tmp2.x*.5+.5)*innerWidth}px, ${(-tmp2.y*.5+.5)*innerHeight}px) translate(-50%,-100%)`;
       const name = nameOf(s);
-      const st = care ? `${CARES[care].label} 받는 중` : onBed ? (av.lie > .95 ? '관리 준비 중' : '관리대로 이동 중') : '라운지 대기';
+      const label = (e.isMe ? me.care : s.care) && CARES[e.isMe ? me.care : s.care];
+      const st = av.glow > .5 ? '관리 완료' : inCare && label ? `${label.label} 받는 중` : onBed ? (av.lie > .95 ? '피부 고민 선택 중' : '관리대로 이동 중') : '라운지 대기';
       const [bEl, sEl] = av.tagEl.children;
       if (bEl.textContent !== name) bEl.textContent = name;
       if (sEl.textContent !== st) sEl.textContent = st;
@@ -1753,7 +1880,7 @@ window.FLEXKIN_SESSION = {
   const clock = new THREE.Clock();
   const camFrom = camera.position.clone().add(new THREE.Vector3(.4, .25, .5)), camTo = camera.position.clone();
   let userMoved = false; controls.addEventListener('start', ()=>userMoved = true);
-  let lastLyingUI = false;
+  let lastLyingUI = false, lastMeBed = me.bed;
   computeOccupancy(); drawPlate(me.r);
   let lastT = 0;
   function tick(){
@@ -1767,6 +1894,11 @@ window.FLEXKIN_SESSION = {
     const slotOf = new Map(waiting.map(([k,e],i)=>[e,i]));
     for (const [k, av] of avs){ const e = all.get(k); if (e) animateAvatar(e, av, t, slotOf.get(e) ?? 0); }
 
+    if (me.bed !== lastMeBed){
+      if (me.bed >= 0){ me.hasLain = true; if (!session) glideTo(BED_VIEW); }
+      else if (!session) glideTo(ENTRY_VIEW);
+      lastMeBed = me.bed;
+    }
     const lyingNow = me.bed >= 0 && meAv.lie > .95;
     if (lyingNow !== lastLyingUI){ lastLyingUI = lyingNow; updateUI(); }
     easeDisplay(); sessionTick(dt);
@@ -1789,9 +1921,9 @@ window.FLEXKIN_SESSION = {
   /* ---------- connect to everyone who has this page open ---------- */
   const dot = document.getElementById('dot');
   // on your own (no shared room), lie down shortly after arriving so the customer is always on the bed
-  const soloLie = setTimeout(()=>{ if (!userActed && !room) autoLie(); }, 1800);
+
   try { room = window.claude && window.claude.use ? await window.claude.use('room') : null; } catch(e){ room = null; }
-  if (!room){ clearTimeout(soloLie); if (!userActed) autoLie(); } else clearTimeout(soloLie);
+
   if (room){
     pushPresence();
     let placed = false;
@@ -1805,8 +1937,7 @@ window.FLEXKIN_SESSION = {
         for (let i=0;i<ROOMS;i++) if (!occ[i] && peopleIn(i) - (i === me.r ? 1 : 0) === 0){ pick = i; break; }
         if (pick < 0) for (let i=0;i<ROOMS;i++) if (!occ[i]){ pick = i; break; }
         if (pick < 0){ let best = Infinity; for (let i=0;i<ROOMS;i++){ const n = peopleIn(i); if (n < best){ best = n; pick = i; } } }
-        if (pick !== me.r){ moveToRoom(pick, !occ[pick]); toast(`관리실 ${two(pick)}로 안내해 드렸어요`); }
-        else autoLie();
+        if (pick !== me.r){ moveToRoom(pick, false); toast(`관리실 ${two(pick)}로 안내해 드렸어요`); }
       }, 1500); }
     }, () => dot.classList.add('off'));
     room.onConnection(ok => dot.classList.toggle('off', !ok), () => dot.classList.add('off'));
