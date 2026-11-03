@@ -933,8 +933,12 @@ window.FLEXKIN_SESSION = {
     const g = x.createRadialGradient(IX/2, IX/2, IX*.28, IX/2, IX/2, IX*.48); g.addColorStop(0, '#fff'); g.addColorStop(1, 'rgba(255,255,255,0)');
     x.fillStyle = g; x.fillRect(0, 0, IX, IX);
     x.globalCompositeOperation = 'destination-out';
-    for (const [ex, ey] of I_EYE){ x.beginPath(); x.ellipse(ex, ey, 15, 14, 0, 0, Math.PI*2); x.fill(); }
-    x.beginPath(); x.ellipse(I_LIPS[0], I_LIPS[1], 18, 9, 0, 0, Math.PI*2); x.fill();
+    // feathered clearing around eyes and lips, so no hard-edged hole shows
+    const clear = (cx, cy, rx, ry)=>{ x.save(); x.translate(cx, cy); x.scale(1, ry / rx);
+      const g = x.createRadialGradient(0, 0, rx * .35, 0, 0, rx); g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      x.fillStyle = g; x.beginPath(); x.arc(0, 0, rx, 0, Math.PI*2); x.fill(); x.restore(); };
+    for (const [ex, ey] of I_EYE) clear(ex, ey, 21, 19);
+    clear(I_LIPS[0], I_LIPS[1], 24, 13);
     const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.userData = { canvas: c }; return t;
   }
   const rr = (a, b) => a + Math.random() * (b - a);
@@ -954,13 +958,23 @@ window.FLEXKIN_SESSION = {
       for (const [cx, cy, r, a] of [[.26,.63,.17,.75],[.74,.63,.17,.75],[.5,.55,.08,.55],[.5,.87,.09,.45],[.5,.22,.13,.3]]) blob(x, cx*IX, cy*IX, r*IX, `rgba(226,92,92,${a})`);
       for (let i=0;i<40;i++){ const cx = (i % 2 ? .74 : .26)*IX + rr(-30, 30), cy = .63*IX + rr(-24, 24); blob(x, cx, cy, rr(2, 4), 'rgba(205,60,64,.8)'); }
     }),
-    // 맑아지고 싶어요: dull grey veil with pigment spots
+    // 맑아지고 싶어요: uneven tone and pigment spots scattered over the whole face
+    // (no flat veil: a uniform layer showed its outline and eye/lip cut-outs like a sheet mask)
     bright: issueCanvas(x=>{
-      x.fillStyle = 'rgba(160,138,120,.28)'; x.fillRect(0, 0, IX, IX);
-      for (let i=0;i<34;i++){ const cx = rr(.2, .8)*IX, cy = rr(.4, .72)*IX;
-        if (Math.hypot(cx - I_LIPS[0], cy - I_LIPS[1]) < 26) continue;
-        blob(x, cx, cy, rr(2, 4.5), `rgba(140,92,62,${rr(.4, .65)})`); }
-      blob(x, .3*IX, .58*IX, .08*IX, 'rgba(120,85,60,.35)'); blob(x, .7*IX, .58*IX, .08*IX, 'rgba(120,85,60,.35)');
+      const nearFeature = (cx, cy, pad) => I_EYE.some(([ex, ey])=>Math.hypot(cx - ex, cy - ey) < 17 + pad) || Math.hypot((cx - I_LIPS[0]) * .8, cy - I_LIPS[1]) < 15 + pad;
+      // soft, uneven dullness: overlapping faint patches with no edge of their own
+      for (const [cx, cy, r, a] of [[.28,.6,.17,.2],[.72,.6,.17,.2],[.5,.22,.2,.14],[.4,.4,.12,.1],[.62,.42,.12,.1],[.5,.86,.1,.12],[.18,.42,.1,.12],[.82,.42,.1,.12]])
+        blob(x, cx*IX, cy*IX, r*IX, `rgba(150,118,96,${a})`);
+      // pigment spots: denser on the cheeks and over the nose, lighter on the forehead and chin
+      const zones = [[.28,.62,.13,26],[.72,.62,.13,26],[.5,.5,.07,12],[.5,.22,.17,14],[.5,.86,.08,6],[.16,.45,.06,6],[.84,.45,.06,6]];
+      for (const [zx, zy, zr, n] of zones) for (let i=0;i<n;i++){
+        const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * zr;
+        const cx = (zx + Math.cos(a) * d) * IX, cy = (zy + Math.sin(a) * d * .85) * IX;
+        if (nearFeature(cx, cy, 4)) continue;
+        blob(x, cx, cy, rr(1.8, 4.2), `rgba(138,90,60,${rr(.35, .62)})`);
+      }
+      // a couple of larger, faint sun spots
+      for (const [cx, cy] of [[.25,.55],[.76,.57],[.42,.18]]) blob(x, cx*IX, cy*IX, rr(6, 9), 'rgba(130,88,60,.32)');
     }),
     // 탄력이 걱정돼요: forehead lines, crow's feet, smile lines and soft sagging shadows
     firm: issueCanvas(x=>{
