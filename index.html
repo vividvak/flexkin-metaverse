@@ -1314,7 +1314,9 @@ window.FLEXKIN_SESSION = {
     const l = session.lines[session.i];
     if (l.stepStart){ session.effect = l.effect; session.effectT = 0; chime(); highlightProducts({ [l.product]:1 }); }
     if (l.group === 0) highlightProducts(null);
-    if (l.group === session.c.steps.length + 1){ session.effect = null; highlightProducts(null); }
+    if (l.group === session.c.steps.length + 1){ session.effect = null; highlightProducts(null);
+      if (!me.glow){ me.glow = true; pushPresence(); }      // '관리 완료': she smiles and her skin starts to glow
+    }
     // crossfade the subtitle
     capLine.classList.add('out');
     if (capKicker.textContent !== l.kicker){ capKicker.classList.add('out'); capThumb.classList.add('out'); }
@@ -1615,7 +1617,7 @@ window.FLEXKIN_SESSION = {
   function faceEffect(dt){
     const av = meAv, e = session && !session.finale ? session.effect : null;
     if (!e || av.lie < .9){
-      if (sessionOwnsFace()){ av.pack.visible = false; brush.material.opacity = 0; if (!session.finale) av.sparks.forEach(sp=>sp.material.opacity = 0); }
+      if (sessionOwnsFace()){ av.pack.visible = false; brush.material.opacity = 0; if (!session.finale && !me.glow) av.sparks.forEach(sp=>sp.material.opacity = 0); }
       return;
     }
     const L = LOOK[e.type] || LOOK.gloss;
@@ -1848,7 +1850,7 @@ window.FLEXKIN_SESSION = {
     else { av.armR.rotation.z += ((lying ? .12 : .32) - av.armR.rotation.z)*.1; av.armR.rotation.x += ((lying ? 0 : -.12) - av.armR.rotation.x)*.1; }
     av.armL.rotation.z += ((lying ? -.12 : -.32) - av.armL.rotation.z)*.1;
     av.armL.rotation.x += ((lying ? 0 : -.12) - av.armL.rotation.x)*.1;
-    const ownFace = av === meAv && inCare;
+    const ownFace = av === meAv && inCare && !me.glow;
     const care = !e.isMe && inCare && av.lie > .95 ? s.care : null;
     if (!ownFace){ av.pack.visible = !!care; if (care) av.pack.material = packMats[care]; }
     av.face.getWorldPosition(tmp2);
