@@ -1769,22 +1769,22 @@ window.FLEXKIN_SESSION = {
     ]},
     // STEP 스킨부스터 — a little on the fingertips, dotted on, spread from the centre outward, then patted in
     droplets: { cam:'front', col:'#e4f2fb', bead:true, moves:[
-      { h:'R', m:'tip', u:[.06,.12], path:[[178,156]], p:{ k:'dab', w:13, a:.6, fade:[.3,.4] } },
-      { h:'L', m:'tip', u:[.12,.18], path:[[78,156]],  p:{ k:'dab', w:13, a:.6, fade:[.3,.4] } },
-      { h:'R', m:'tip', u:[.2,.26],  path:[[128,46]],  p:{ k:'dab', w:13, a:.6, fade:[.5,.58] } },
-      { h:'B', m:'tip', u:[.3,.37],  path:[[152,160],[182,162],[208,164]], p:{ k:'line', w:22, a:.24, fade:[.68,.95], floor:.3 } },
-      { h:'B', m:'tip', u:[.39,.46], path:[[156,184],[182,188],[206,192]], p:{ k:'line', w:22, a:.24, fade:[.68,.95], floor:.3 } },
-      { h:'B', m:'tip', u:[.5,.6],   path:[[142,46],[166,42],[190,46]],    p:{ k:'line', w:22, a:.24, fade:[.68,.95], floor:.3 } },
+      { h:'R', m:'tip', u:[.06,.12], path:[[178,156]], p:{ k:'dab', w:13, a:.75, fade:[.3,.4] } },
+      { h:'L', m:'tip', u:[.12,.18], path:[[78,156]],  p:{ k:'dab', w:13, a:.75, fade:[.3,.4] } },
+      { h:'R', m:'tip', u:[.2,.26],  path:[[128,46]],  p:{ k:'dab', w:13, a:.75, fade:[.5,.58] } },
+      { h:'B', m:'tip', u:[.3,.37],  path:[[152,160],[182,162],[208,164]], p:{ k:'line', w:22, a:.42, fade:[.68,.95], floor:.3 } },
+      { h:'B', m:'tip', u:[.39,.46], path:[[156,184],[182,188],[206,192]], p:{ k:'line', w:22, a:.42, fade:[.68,.95], floor:.3 } },
+      { h:'B', m:'tip', u:[.5,.6],   path:[[142,46],[166,42],[190,46]],    p:{ k:'line', w:22, a:.42, fade:[.68,.95], floor:.3 } },
       { h:'B', m:'tip', u:[.65,.9],  path:[[160,140],[188,150],[198,172],[176,184]], taps:9 },
     ]},
     // STEP 세럼 — long, slow glides: beside the nose out to the cheekbone, forehead out to the temples, palms to finish
     gloss: { cam:'serum', col:'#eaf4f8', bead:true, moves:[
-      { h:'B', m:'tip', u:[.04,.1],   path:[[152,150]], p:{ k:'dab', w:11, a:.5, fade:[.14,.22] } },
-      { h:'B', m:'tip', u:[.14,.27],  path:[[150,150],[172,141],[196,133],[214,128]], p:{ k:'line', w:24, a:.24, fade:[.6,.95], floor:.35 } },
-      { h:'B', m:'tip', u:[.3,.42],   path:[[150,170],[176,163],[200,155],[216,148]], p:{ k:'line', w:24, a:.24, fade:[.6,.95], floor:.35 } },
-      { h:'B', m:'tip', u:[.45,.55],  path:[[160,198],[182,190],[202,178],[216,166]], p:{ k:'line', w:24, a:.24, fade:[.6,.95], floor:.35 } },
-      { h:'B', m:'tip', u:[.58,.69],  path:[[142,50],[166,48],[192,54]], p:{ k:'line', w:24, a:.24, fade:[.7,.95], floor:.35 } },
-      { h:'B', m:'tip', u:[.71,.79],  path:[[142,72],[166,72],[188,80]], p:{ k:'line', w:24, a:.24, fade:[.75,.95], floor:.35 } },
+      { h:'B', m:'tip', u:[.04,.1],   path:[[152,150]], p:{ k:'dab', w:11, a:.7, fade:[.14,.22] } },
+      { h:'B', m:'tip', u:[.14,.27],  path:[[150,150],[172,141],[196,133],[214,128]], p:{ k:'line', w:24, a:.4, fade:[.6,.95], floor:.35 } },
+      { h:'B', m:'tip', u:[.3,.42],   path:[[150,170],[176,163],[200,155],[216,148]], p:{ k:'line', w:24, a:.4, fade:[.6,.95], floor:.35 } },
+      { h:'B', m:'tip', u:[.45,.55],  path:[[160,198],[182,190],[202,178],[216,166]], p:{ k:'line', w:24, a:.4, fade:[.6,.95], floor:.35 } },
+      { h:'B', m:'tip', u:[.58,.69],  path:[[142,50],[166,48],[192,54]], p:{ k:'line', w:24, a:.4, fade:[.7,.95], floor:.35 } },
+      { h:'B', m:'tip', u:[.71,.79],  path:[[142,72],[166,72],[188,80]], p:{ k:'line', w:24, a:.4, fade:[.75,.95], floor:.35 } },
       { h:'B', m:'palm', u:[.83,.95], path:[[184,164]], press:true },
     ]},
     // STEP 크림 — dotted on, small circles on each area, then both hands sweep up to the temples and cradle the cheeks
@@ -1793,10 +1793,10 @@ window.FLEXKIN_SESSION = {
       { h:'L', m:'tip', u:[.07,.11], path:[[74,160]],  p:{ k:'dab', w:15, a:.95, fade:[.31,.41] } },
       { h:'R', m:'tip', u:[.11,.15], path:[[128,48]],  p:{ k:'dab', w:15, a:.95, fade:[.42,.5] } },
       { h:'R', m:'tip', u:[.15,.19], path:[[128,224]], p:{ k:'dab', w:13, a:.95, fade:[.51,.58] } },
-      { h:'R', m:'tip', u:[.2,.3],   path:circ(182,160,9,2.5,Math.PI),  p:{ k:'line', w:9, a:.8, fade:[.6,.9], floor:.16, grow:2.4 } },
-      { h:'L', m:'tip', u:[.31,.41], path:circ(74,160,9,2.5,0),        p:{ k:'line', w:9, a:.8, fade:[.6,.9], floor:.16, grow:2.4 } },
-      { h:'R', m:'tip', u:[.42,.5],  path:circ(128,48,10,2.5,Math.PI/2), p:{ k:'line', w:9, a:.8, fade:[.62,.9], floor:.16, grow:2.4 } },
-      { h:'R', m:'tip', u:[.51,.58], path:circ(128,224,7,2,-Math.PI/2),  p:{ k:'line', w:9, a:.8, fade:[.62,.9], floor:.16, grow:2.4 } },
+      { h:'R', m:'tip', u:[.2,.3],   path:circ(182,160,9,2.5,Math.PI),  p:{ k:'line', w:11, a:.85, fade:[.6,.9], floor:.16, grow:2.4 } },
+      { h:'L', m:'tip', u:[.31,.41], path:circ(74,160,9,2.5,0),        p:{ k:'line', w:11, a:.85, fade:[.6,.9], floor:.16, grow:2.4 } },
+      { h:'R', m:'tip', u:[.42,.5],  path:circ(128,48,10,2.5,Math.PI/2), p:{ k:'line', w:11, a:.85, fade:[.62,.9], floor:.16, grow:2.4 } },
+      { h:'R', m:'tip', u:[.51,.58], path:circ(128,224,7,2,-Math.PI/2),  p:{ k:'line', w:11, a:.85, fade:[.62,.9], floor:.16, grow:2.4 } },
       { h:'B', m:'palm', u:[.63,.73], path:[[168,196],[194,164],[212,126]] },
       { h:'B', m:'palm', u:[.75,.83], path:[[166,190],[192,160],[210,122]] },
       { h:'B', m:'palm', u:[.86,.95], path:[[186,160]], press:true },
@@ -1808,12 +1808,12 @@ window.FLEXKIN_SESSION = {
       { h:'L', m:'tip', u:[.07,.1],  path:[[76,158]],  p:{ k:'dab', w:10, a:.85, fade:[.29,.37] } },
       { h:'R', m:'tip', u:[.11,.14], path:[[128,112]], p:{ k:'dab', w:9,  a:.85, fade:[.46,.54] } },
       { h:'R', m:'tip', u:[.15,.18], path:[[128,224]], p:{ k:'dab', w:9,  a:.85, fade:[.68,.78] } },
-      { h:'B', m:'tip', u:[.2,.27],  path:[[140,46],[164,44],[190,48]],    p:{ k:'line', w:18, a:.34, fade:[.6,.95], floor:.2 } },
-      { h:'B', m:'tip', u:[.29,.35], path:[[150,150],[178,152],[206,156]], p:{ k:'line', w:18, a:.34, fade:[.6,.95], floor:.2 } },
-      { h:'B', m:'tip', u:[.36,.42], path:[[150,172],[178,176],[204,182]], p:{ k:'line', w:18, a:.34, fade:[.6,.95], floor:.2 } },
-      { h:'R', m:'tip', u:[.46,.54], path:zig([138,100],[148,150],3,10),  p:{ k:'line', w:12, a:.3, fade:[.6,.95], floor:.2 } },
-      { h:'L', m:'tip', u:[.55,.63], path:HM(zig([138,100],[148,150],3,10)), p:{ k:'line', w:12, a:.3, fade:[.6,.95], floor:.2 } },
-      { h:'B', m:'tip', u:[.67,.79], path:zig([150,214],[204,176],3,12),  p:{ k:'line', w:14, a:.3, fade:[.7,.95], floor:.2 } },
+      { h:'B', m:'tip', u:[.2,.27],  path:[[140,46],[164,44],[190,48]],    p:{ k:'line', w:18, a:.46, fade:[.6,.95], floor:.2 } },
+      { h:'B', m:'tip', u:[.29,.35], path:[[150,150],[178,152],[206,156]], p:{ k:'line', w:18, a:.46, fade:[.6,.95], floor:.2 } },
+      { h:'B', m:'tip', u:[.36,.42], path:[[150,172],[178,176],[204,182]], p:{ k:'line', w:18, a:.46, fade:[.6,.95], floor:.2 } },
+      { h:'R', m:'tip', u:[.46,.54], path:zig([138,100],[148,150],3,10),  p:{ k:'line', w:12, a:.42, fade:[.6,.95], floor:.2 } },
+      { h:'L', m:'tip', u:[.55,.63], path:HM(zig([138,100],[148,150],3,10)), p:{ k:'line', w:12, a:.42, fade:[.6,.95], floor:.2 } },
+      { h:'B', m:'tip', u:[.67,.79], path:zig([150,214],[204,176],3,12),  p:{ k:'line', w:14, a:.42, fade:[.7,.95], floor:.2 } },
     ]},
   };
   const CAMS = {
@@ -1827,6 +1827,8 @@ window.FLEXKIN_SESSION = {
   // the hands themselves: simple rounded forms, an ivory sleeve, warm skin
   const HAND_SKIN = new THREE.MeshStandardMaterial({ color:0xe6c1a2, roughness:.6 });
   const SLEEVE_MAT = new THREE.MeshStandardMaterial({ color:0xf1ebe1, roughness:.92 });
+  // the hands are never drawn: only the tools (brush, pad) show; fingertip work shows as the formula alone
+  HAND_SKIN.visible = false; SLEEVE_MAT.visible = false;
   const C_TIP = new THREE.Vector3(-.004, -.023, .12), C_PALM = new THREE.Vector3(0, -.0145, .04);
   const BR_A = new THREE.Vector3(0, -.55, .83).normalize(), BR_G = new THREE.Vector3(0, -.016, .088);
   const C_BRUSH = BR_G.clone().addScaledVector(BR_A, .142), C_PAD = C_TIP.clone().add(new THREE.Vector3(0, -.0068, 0));
@@ -1943,7 +1945,7 @@ window.FLEXKIN_SESSION = {
     const k = jump ? 1 : 1 - Math.exp(-dt * 16);
     H.g.position.lerp(hv.tp, k); H.g.quaternion.slerp(hv.tq, k);
     H.pad.visible = st.mode === 'pad'; if (H.brush) H.brush.visible = st.mode === 'brush';
-    H.bead.visible = !!st.bead;
+    H.bead.visible = false;                         // no formula floating in the air
     return st.out < .5 && (st.cur || st.next);
   }
   function hideHand(H, dt){
@@ -1987,7 +1989,13 @@ window.FLEXKIN_SESSION = {
           pCtx.fillStyle = `rgba(255,255,255,${.85 * a})`; pCtx.beginPath(); pCtx.ellipse(x - r * .3, y - r * .32, r * .28, r * .17, -.6, 0, Math.PI*2); pCtx.fill();
         } else if (pts.length > 1 && a > .005){
           pCtx.strokeStyle = rgba(col, a); pCtx.lineWidth = w; polyline(pCtx, pts, fe, 0);
-          if (fade < .9){ pCtx.strokeStyle = `rgba(255,255,255,${.35 * a * (1 - fade)})`; pCtx.lineWidth = Math.max(1.2, w * .14); polyline(pCtx, pts, fe, -w * .22); }
+          if (fade < .9){ pCtx.strokeStyle = `rgba(255,255,255,${.6 * a * (1 - fade)})`; pCtx.lineWidth = Math.max(1.2, w * .14); polyline(pCtx, pts, fe, -w * .22); }
+          // the wet leading edge, where the formula is being spread right now
+          if (f > 0 && f < 1){ const [hx, hy] = pathAt(pts, fe), r = w * .62;
+            const g = pCtx.createRadialGradient(hx, hy, 0, hx, hy, r);
+            g.addColorStop(0, rgba(col, Math.min(1, a * 1.9))); g.addColorStop(1, rgba(col, 0));
+            pCtx.fillStyle = g; pCtx.beginPath(); pCtx.arc(hx, hy, r, 0, Math.PI*2); pCtx.fill();
+            pCtx.fillStyle = `rgba(255,255,255,${Math.min(.9, a * 1.6)})`; pCtx.beginPath(); pCtx.ellipse(hx - r * .25, hy - r * .3, r * .26, r * .14, -.6, 0, Math.PI*2); pCtx.fill(); }
         }
       }
     }
