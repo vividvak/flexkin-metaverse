@@ -1011,11 +1011,17 @@ window.FLEXKIN_SESSION = {
     nose: new THREE.SphereGeometry(.011, 10, 8),
     mouth: new THREE.TorusGeometry(.02, .0055, 8, 20, Math.PI), grin: new THREE.CircleGeometry(.03, 24, Math.PI, Math.PI),
     pack: new THREE.SphereGeometry(.207, 36, 16, Math.PI*.2, Math.PI*.6, Math.PI*.3, Math.PI*.42),
+    // spa turban (worn on the bed): towel wrap, rolled band, a soft twist on top, FLEXKIN label
+    tWrap: new THREE.SphereGeometry(.224, 40, 24, 0, Math.PI*2, 0, Math.PI*.42),
+    tBand: new THREE.TorusGeometry(.216, .03, 14, 56),
+    tTwist: new THREE.TorusGeometry(.05, .026, 12, 24),
+    tLabel: new THREE.CylinderGeometry(.2475, .2475, .056, 40, 1, true, -.36, .72),
     issue: new THREE.SphereGeometry(.2035, 36, 16, Math.PI*.2, Math.PI*.6, Math.PI*.3, Math.PI*.42),
   };
   const HEAD_SCALE = 1.18, HEAD_Y = .5;          // big round head on a short body
   const FACE_UP = HEAD_Y + .2 * HEAD_SCALE;      // height of the face centre above the feet (.736)
 
+  const turbanLabel = new THREE.MeshStandardMaterial({ map:logoTex, transparent:true, alphaTest:.35, roughness:.55, polygonOffset:true, polygonOffsetFactor:-2 });
   function makeAvatar(look){
     const ch = new THREE.Group(); scene.add(ch);
     const body = new THREE.Group(); ch.add(body);
@@ -1041,10 +1047,19 @@ window.FLEXKIN_SESSION = {
     const face = add(G.face, skinMat, 0, .2, 0, H); face.scale.set(1, .95, .95);
     [-1,1].forEach(s=>add(G.ear, skinMat, s*.195, .19, 0, H));
     const hair = HAIR[look.h % HAIR.length];
-    add(G.cap, hair, 0, .21, -.006, {rx:-.38, parent:head});
-    add(G.bangs, hair, 0, .212, .006, H);
-    add(G.bun, hair, 0, .42, -.06, H);
-    add(G.scrunchie, robeTrim, 0, .37, -.05, {rx:Math.PI/2+.3, parent:head});
+    const hairParts = [
+      add(G.cap, hair, 0, .21, -.006, {rx:-.38, parent:head}),
+      add(G.bangs, hair, 0, .212, .006, H),
+      add(G.bun, hair, 0, .42, -.06, H),
+      add(G.scrunchie, robeTrim, 0, .37, -.05, {rx:Math.PI/2+.3, parent:head}) ];
+    // on the bed the hair goes under a towel turban, so the whole forehead is free for the care
+    const turban = new THREE.Group(); turban.position.set(0, .2, -.004); turban.rotation.x = -.55; head.add(turban); turban.visible = false;
+    add(G.tWrap, robe, 0, 0, 0, {parent:turban});
+    const bandY = .224 * Math.cos(Math.PI*.42);
+    add(G.tBand, robeTrim, 0, bandY, 0, {rx:Math.PI/2, parent:turban});
+    add(G.tTwist, robeTrim, 0, .2, .09, {rx:-.9, parent:turban}).scale.set(1, 1, .8);
+    add(G.tTwist, robe, 0, .225, .03, {rx:-1.3, rz:.5, parent:turban}).scale.set(.8, .8, .7);
+    add(G.tLabel, turbanLabel, 0, bandY, 0, {parent:turban, cast:false});
     // the skin concern sits just above the skin, under the care layer
     const issueMat = new THREE.MeshStandardMaterial({ transparent:true, opacity:0, depthWrite:false, roughness:.7, polygonOffset:true, polygonOffsetFactor:-1 });
     const issue = add(G.issue, issueMat, 0, .2, 0, {parent:head, cast:false}); issue.scale.set(1, .95, .95); issue.visible = false;
@@ -1069,7 +1084,7 @@ window.FLEXKIN_SESSION = {
     const feetAO = [contact(.5, .42, 0, .02, feet, 1), contact(.14, .24, -.065, .02, feet, .9), contact(.14, .24, .065, .02, feet, .9)];
     const tagEl = document.createElement('div'); tagEl.className = 'tag'; tagEl.hidden = true;
     tagEl.append(document.createElement('b'), document.createElement('span')); document.getElementById('tags').append(tagEl);
-    const av = { ch, body, head, face, armL, armR, eyes, open, closed, happy, brows, blush, mSmile, mSad, mGrin, issue, issueMat, skinMat, pack, sparks, feet, feetAO, tagEl,
+    const av = { hairParts, turban, turbanOn:false, ch, body, head, face, armL, armR, eyes, open, closed, happy, brows, blush, mSmile, mSad, mGrin, issue, issueMat, skinMat, pack, sparks, feet, feetAO, tagEl,
       from:null, to:null, t0:0, lie:0, bowT:-10, waveT:-10, nextBlink:2+Math.random()*3, seed:Math.random()*10, care:null, glow:0, issueK:0, issueKey:null, expr:null };
     av.dispose = () => { scene.remove(ch, feet); sparks.forEach(s=>scene.remove(s)); tagEl.remove(); };
     return av;
@@ -2249,6 +2264,8 @@ window.FLEXKIN_SESSION = {
     const glowT = (e.isMe ? me.glow : s.glow) ? 1 : 0;
     av.glow += (glowT - av.glow) * (reduce ? 1 : .03);
     const expr = av.glow > .5 ? 'happy' : av.lie > .6 ? 'sad' : 'neutral';
+    const tb = av.lie > .45;                                  // turban on while lying on the bed
+    if (av.turbanOn !== tb){ av.turbanOn = tb; av.hairParts.forEach(m=>m.visible = !tb); av.turban.visible = tb; }
     setExpression(av, expr, expr === 'sad' && inCare);
     const closedEyes = expr === 'happy' || (expr === 'sad' && inCare);
     const eyeH = expr === 'sad' ? 1.1 : 1.35;
