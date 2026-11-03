@@ -288,6 +288,7 @@ a.f-tile:focus-visible{outline:2px solid #dcc18f;outline-offset:2px;}
    - image: 배경을 지운 제품 사진(products/ 폴더). 비워 두면 진열대에 기본 오브제가 놓입니다.
    - height: 진열대에 놓일 실제 높이(m). model: 나중에 3D 모델을 연결할 자리입니다.
    - link: 플렉스킨 홈페이지 상세페이지. 마무리 카드에서 제품 사진을 누르면 열립니다.
+   - listAs: 마무리 카드의 '오늘 사용한 제품'에 다른 상품으로 묶어 보여 줄 때 (필링·스킨부스터 → 미니키트)
    ===================================================================== */
 
 /* 진열대에 없는 추천 상품(키트 등)의 상세페이지 주소 */
@@ -298,8 +299,8 @@ window.FLEXKIN_LINKS = {
 
 /* 여러 관리에서 함께 쓰는 제품 */
 window.FLEXKIN_PRODUCTS = {
-  hsPeeling: { name:'히알스톰 필링',       shape:'bottle',  color:'#eaf3f7', cap:'#c8b28a', effect:'shimmer', image:'products/hsPeeling.webp', height:0.068, link:'https://flexkin.co.kr/product/detail.html?product_no=345&cate_no=56&display_group=1', model:'' },
-  hsBooster: { name:'히알스톰 스킨부스터', shape:'dropper', color:'#dcecf4', cap:'#f4efe6', effect:'droplets', image:'products/hsBooster.webp', height:0.068, link:'https://flexkin.co.kr/product/detail.html?product_no=344&cate_no=56&display_group=1', model:'' },
+  hsPeeling: { name:'히알스톰 필링',       shape:'bottle',  color:'#eaf3f7', cap:'#c8b28a', effect:'shimmer', listAs:'miniKit', image:'products/hsPeeling.webp', height:0.068, link:'https://flexkin.co.kr/product/detail.html?product_no=345&cate_no=56&display_group=1', model:'' },
+  hsBooster: { name:'히알스톰 스킨부스터', shape:'dropper', color:'#dcecf4', cap:'#f4efe6', effect:'droplets', listAs:'miniKit', image:'products/hsBooster.webp', height:0.068, link:'https://flexkin.co.kr/product/detail.html?product_no=344&cate_no=56&display_group=1', model:'' },
   hsSerum:   { name:'히알스톰 세럼',       shape:'dropper', color:'#e6f1f6', cap:'#c8b28a', effect:'gloss', image:'products/hsSerum.webp', height:0.12, link:'https://flexkin.co.kr/product/detail.html?product_no=362&cate_no=56&display_group=1', model:'' },
   hsCream:   { name:'히알스톰 크림',       shape:'jar',     color:'#f2f7f9', cap:'#c8b28a', effect:'cream', image:'products/hsCream.webp', height:0.135, link:'https://flexkin.co.kr/product/detail.html?product_no=363&cate_no=56&display_group=1', model:'' },
   hsSun:     { name:'히알스톰 선크림',     shape:'tube',    color:'#f4f8fa', cap:'#c8b28a', effect:'veil', image:'products/hsSun.webp', height:0.115, link:'https://flexkin.co.kr/product/detail.html?product_no=364&cate_no=56&display_group=1', model:'' },
@@ -310,7 +311,9 @@ window.FLEXKIN_PRODUCTS = {
   brightAmp: { name:'브라이트닝 앰플',     shape:'dropper', color:'#f8efd6', cap:'#f4efe6', effect:'droplets', image:'products/brightAmp.webp', height:0.14, link:'https://flexkin.co.kr/product/detail.html?product_no=497&cate_no=61&display_group=1', model:'' },
   vitaModel: { name:'비타민 모델링',       shape:'pouch',   color:'#efeeea', cap:'#e9dcb8', effect:'modeling', effectColor:'#f1c3b6', image:'products/vitaModel.webp', thumb:'products/vitaModelBowl.webp', height:.2, link:'https://flexkin.co.kr/product/detail.html?product_no=386&cate_no=61&display_group=1', model:'' },
   rRefine:   { name:'R-리파인 앰플',       shape:'dropper', color:'#ece3ef', cap:'#f4efe6', effect:'gloss', image:'products/rRefine.webp', height:0.14, link:'https://flexkin.co.kr/product/detail.html?product_no=498&cate_no=61&display_group=1', model:'' },
-  damiMask:  { name:'단미 마스크',         shape:'pouch',   color:'#f5ede3', cap:'#c8b28a', effect:'sheet', image:'products/damiMask.webp', height:0.165, link:'https://flexkin.co.kr/product/detail.html?product_no=378&cate_no=46&display_group=1', model:'' }
+  damiMask:  { name:'단미 마스크',         shape:'pouch',   color:'#f5ede3', cap:'#c8b28a', effect:'sheet', image:'products/damiMask.webp', height:0.165, link:'https://flexkin.co.kr/product/detail.html?product_no=378&cate_no=46&display_group=1', model:'' },
+  // 진열대에는 올리지 않고, 마무리 카드에서 필링·스킨부스터 대신 보여 주는 판매 상품
+  miniKit:   { name:'히알스톰 미니키트',     shape:'box',     color:'#f4f0ea', cap:'#c8b28a', image:'products/miniKit.webp', link:'https://flexkin.co.kr/product/detail.html?product_no=481&cate_no=56&display_group=1', model:'', shelf:false }
 };
 
 /* 피부 고민 → 관리 프로그램 (버튼 순서 = 배열 순서) */
@@ -336,7 +339,7 @@ window.FLEXKIN_CARE = [
       ],
       recommend: [
         { label:'히알스톰 3종 애프터케어', group:['hsSerum','hsCream','hsSun'] },   // 세 제품에 각각 추천 표시
-        { label:'히알스톰 미니키트',       link:'hyalstormMiniKit' }
+        { label:'히알스톰 미니키트',       product:'miniKit' }
       ]
     }
   },
@@ -1237,7 +1240,9 @@ window.FLEXKIN_SESSION = {
     const okUrl = u => typeof u === 'string' && /^https:\/\//.test(u) ? u : '';
     const urlOf = id => okUrl((CATALOG[id] || {}).link);
     const recUrl = r => r.group ? urlOf(r.group[0]) : r.product ? urlOf(r.product) : okUrl(LINKS[r.link]);
-    const used = c.steps.map(s=>s.product).filter((v, i, a)=>a.indexOf(v) === i);
+    const shelfUsed = c.steps.map(s=>s.product).filter((v, i, a)=>a.indexOf(v) === i);
+    // professional-only items are listed as the retail product that contains them
+    const used = shelfUsed.map(id=>(CATALOG[id] && CATALOG[id].listAs && CATALOG[CATALOG[id].listAs]) ? CATALOG[id].listAs : id).filter((v, i, a)=>a.indexOf(v) === i);
     const chips = used.map(id=>({ name:(CATALOG[id] || {}).name || id, image:(CATALOG[id] || {}).image || '', rec:recIds.has(id), url:urlOf(id) }))
       .concat(recs.filter(r=>!r.group && (!r.product || !used.includes(r.product))).map(r=>({ name:r.label, rec:true, url:recUrl(r) })));
     gid('fUsed').replaceChildren(...chips.map(ch=>{
@@ -1251,7 +1256,7 @@ window.FLEXKIN_SESSION = {
     const a = gid('fProduct'); if (link){ a.href = link; a.removeAttribute('aria-disabled'); } else { a.removeAttribute('href'); a.setAttribute('aria-disabled','true'); }
     finaleEl.hidden = false; gid('fInner').scrollTop = 0;
     // the one advertising moment: the products used today, softly lit on the display
-    const levels = {}; used.forEach(id=>levels[id] = recIds.has(id) ? 1 : .45); highlightProducts(levels);
+    const levels = {}; shelfUsed.forEach(id=>levels[id] = recIds.has(id) || recIds.has((CATALOG[id] || {}).listAs) ? 1 : .45); highlightProducts(levels);
     glideTo(DISPLAY_VIEW);
     applyLevel(4);
   }
