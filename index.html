@@ -1678,18 +1678,12 @@ window.FLEXKIN_SESSION = {
   }
 
   /* ---------- the applicators: the product photo, a spatula, falling drops ---------- */
-  const spatTex = canvasTex(160, 40, (c, w, h)=>{ c.fillStyle = '#f7f5f0'; c.strokeStyle = 'rgba(120,110,100,.5)'; c.lineWidth = 2;
-    c.beginPath(); c.moveTo(6, 20); c.quadraticCurveTo(6, 6, 30, 7); c.lineTo(70, 12); c.lineTo(154, 15); c.quadraticCurveTo(158, 20, 154, 25); c.lineTo(70, 28); c.lineTo(30, 33); c.quadraticCurveTo(6, 34, 6, 20); c.closePath(); c.fill(); c.stroke();
-    c.fillStyle = 'rgba(255,255,255,.9)'; c.fillRect(30, 12, 38, 3); });
   const dropTex = canvasTex(48, 64, (c, w, h)=>{ c.fillStyle = '#fff'; c.beginPath(); c.moveTo(24, 4); c.bezierCurveTo(34, 24, 44, 34, 44, 44); c.arc(24, 44, 20, 0, Math.PI); c.bezierCurveTo(4, 34, 14, 24, 24, 4); c.fill();
     c.fillStyle = 'rgba(255,255,255,1)'; c.globalCompositeOperation = 'destination-out'; c.globalAlpha = .45; c.beginPath(); c.arc(24, 46, 15, 0, Math.PI*2); c.fill(); c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1;
     c.fillStyle = '#fff'; c.beginPath(); c.ellipse(17, 38, 4, 7, -.4, 0, Math.PI*2); c.fill(); });
   const prodSprite = new THREE.Sprite(new THREE.SpriteMaterial({ transparent:true, opacity:0, depthWrite:false }));
-  const spatSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map:spatTex, transparent:true, opacity:0, depthWrite:false }));
-  const beadSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map:haloTex, transparent:true, opacity:0, depthWrite:false }));
   const fallSprites = [0,1,2,3].map(()=>new THREE.Sprite(new THREE.SpriteMaterial({ map:dropTex, transparent:true, opacity:0, depthWrite:false })));
-  [prodSprite, spatSprite, beadSprite, ...fallSprites].forEach(sp=>{ sp.renderOrder = 6; scene.add(sp); });
-  spatSprite.scale.set(.13, .033, 1);
+  [prodSprite, ...fallSprites].forEach(sp=>{ sp.renderOrder = 6; scene.add(sp); });
   let prodShown = null;
   function showProduct(url){
     if (prodShown === url) return; prodShown = url;
@@ -1699,7 +1693,6 @@ window.FLEXKIN_SESSION = {
       prodSprite.material.map = t; prodSprite.material.needsUpdate = true;
       const a = t.image.width / t.image.height, h = .15; prodSprite.scale.set(h * a, h, 1); prodSprite.userData.h = h; }).catch(()=>{});
   }
-  const brush = beadSprite;                                      // kept for older call sites
   const uvTmp = new THREE.Vector3(), fTmp = new THREE.Vector3(), eCol = new THREE.Color(), pA = new THREE.Vector3(), pB = new THREE.Vector3(), camR = new THREE.Vector3();
   function facePoint(px, py, out){
     const u = px / FX, v = 1 - py / FX, r = .214;
@@ -1710,7 +1703,7 @@ window.FLEXKIN_SESSION = {
   const ease = f => f < .5 ? 2*f*f : 1 - Math.pow(-2*f + 2, 2)/2;
   function hideTools(dt){
     const k = Math.max(0, 1 - dt * 3);
-    [prodSprite, spatSprite, beadSprite, ...fallSprites].forEach(sp=>sp.material.opacity *= k);
+    [prodSprite, ...fallSprites].forEach(sp=>sp.material.opacity *= k);
   }
 
   function faceEffect(dt){
@@ -1737,7 +1730,7 @@ window.FLEXKIN_SESSION = {
     av.face.getWorldPosition(fTmp);
     camR.setFromMatrixColumn(camera.matrixWorld, 0);
     const bob = reduce ? 0 : Math.sin(s * 2.2) * .008;
-    let prodTarget = null, prodTilt = -.15, spatAt = null, spatAngle = 0, beadAt = null;
+    let prodTarget = null, prodTilt = -.15;
     if (L.tool === 'drop'){
       const next = fx.drops.find(d=>d.at > s - .1) || fx.drops[fx.drops.length - 1];
       facePoint(next.x, next.y, pA);
@@ -1747,16 +1740,6 @@ window.FLEXKIN_SESSION = {
       const dispensing = fx.dots.find(d=>d.at > s - .2 && d.at < s + .45);
       if (dispensing){ facePoint(dispensing.x, dispensing.y, pA); prodTarget = pA.clone().add(new THREE.Vector3(0, .15, 0)); prodTilt = -.9; }
       else prodTarget = fTmp.clone().addScaledVector(camR, .3).add(new THREE.Vector3(0, .14 + bob, 0));
-      const st = fx.strokes.find(q=>s >= q.t0 && s <= q.t1) || fx.strokes.find(q=>q.t0 > s);
-      if (st && s < L.dur){
-        const f = clamp01((s - st.t0) / (st.t1 - st.t0)), idx = Math.min(st.pts.length - 2, Math.floor(f * (st.pts.length - 1)));
-        const [ax, ay] = st.pts[idx], [bx, by] = st.pts[idx + 1], g = f * (st.pts.length - 1) - idx;
-        facePoint(ax + (bx - ax) * g, ay + (by - ay) * g, pA); spatAt = pA.clone().add(new THREE.Vector3(0, .02, 0));
-        facePoint(bx, by, pB);
-        const sa = pA.clone().project(camera), sb = pB.clone().project(camera);
-        spatAngle = Math.atan2((sb.y - sa.y), (sb.x - sa.x) * camera.aspect);
-        if (f < .25) beadAt = spatAt;
-      }
     } else {
       prodTarget = fTmp.clone().addScaledVector(camR, .3).add(new THREE.Vector3(0, .14 + bob, 0));
     }
@@ -1767,14 +1750,6 @@ window.FLEXKIN_SESSION = {
       prodSprite.material.rotation += (prodTilt - prodSprite.material.rotation) * Math.min(1, dt * 5);
       prodSprite.material.opacity = prodSprite.material.map ? vis : 0;
     }
-    if (spatAt && !reduce){
-      if (spatSprite.material.opacity < .05) spatSprite.position.copy(spatAt);
-      spatSprite.position.lerp(spatAt, Math.min(1, dt * 10));
-      spatSprite.material.rotation = spatAngle + Math.PI;
-      spatSprite.material.opacity = Math.min(1, spatSprite.material.opacity + dt * 4);
-    } else spatSprite.material.opacity = Math.max(0, spatSprite.material.opacity - dt * 3);
-    if (beadAt){ beadSprite.position.copy(beadAt); beadSprite.material.color.copy(eCol); beadSprite.material.opacity = .9; beadSprite.scale.setScalar(.035); }
-    else beadSprite.material.opacity = Math.max(0, beadSprite.material.opacity - dt * 3);
 
     // falling drops: from the bottle tip down to where they land
     if (L.tool === 'drop' && !reduce){
