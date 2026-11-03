@@ -176,6 +176,11 @@ body.session .top{background:none;}
   background:linear-gradient(to bottom,#f6f0e6,#ebe2d4);color:#3a2f25;text-align:center;}
 .f-tile img{height:70px;width:100%;object-fit:contain;filter:drop-shadow(0 4px 6px rgba(60,40,20,.25));}
 .f-tile span{font-size:11.5px;line-height:1.35;word-break:keep-all;}
+a.f-tile{text-decoration:none;cursor:pointer;transition:transform .2s ease, box-shadow .2s ease;}
+a.f-tile::after{content:"";position:absolute;top:7px;right:7px;width:6px;height:6px;border-top:1.5px solid #9a7a4a;border-right:1.5px solid #9a7a4a;}
+a.f-tile:hover{transform:translateY(-2px);box-shadow:0 6px 14px rgba(0,0,0,.18);}
+a.f-tile.rec:hover{box-shadow:inset 0 0 0 2px #c9a86e,0 6px 14px rgba(0,0,0,.18);}
+a.f-tile:focus-visible{outline:2px solid #dcc18f;outline-offset:2px;}
 .f-tile.text{justify-content:center;min-height:116px;}
 .f-tile.rec{box-shadow:inset 0 0 0 2px #c9a86e;}
 .f-tile em{position:absolute;top:6px;left:6px;font-style:normal;font-size:10px;font-weight:600;color:#fff;background:#b08a52;border-radius:5px;padding:1px 5px;}
@@ -243,7 +248,7 @@ body.session .top{background:none;}
     <h3 id="fTitle">오늘의 FLEXKIN 관리가 완료되었습니다.</h3>
     <p class="f-prog" id="fProg"></p>
     <div id="fHome"></div>
-    <div><span class="f-label">오늘 사용한 제품</span><div id="fUsed"></div></div>
+    <div><span class="f-label">오늘 사용한 제품 · 누르면 상세페이지가 열려요</span><div id="fUsed"></div></div>
     <div class="f-actions">
       <button class="f-btn" id="fOther" type="button">다른 피부 고민 선택하기</button>
       <a class="f-btn primary" id="fProduct" target="_blank" rel="noopener">추천 제품 자세히 보기</a>
@@ -282,32 +287,30 @@ body.session .top{background:none;}
        'veil'(선크림) | 'modeling'(모델링팩) | 'sheet'(시트 마스크)
    - image: 배경을 지운 제품 사진(products/ 폴더). 비워 두면 진열대에 기본 오브제가 놓입니다.
    - height: 진열대에 놓일 실제 높이(m). model: 나중에 3D 모델을 연결할 자리입니다.
+   - link: 플렉스킨 홈페이지 상세페이지. 마무리 카드에서 제품 사진을 누르면 열립니다.
    ===================================================================== */
 
-/* '추천 제품 자세히 보기' 링크. 공식 제품 페이지 주소가 생기면 '' 안에 넣어 주세요. */
+/* 진열대에 없는 추천 상품(키트 등)의 상세페이지 주소 */
 window.FLEXKIN_LINKS = {
-  hyalstormAftercare: '',   // 히알스톰 3종 애프터케어
-  hyalstormMiniKit:   '',   // 히알스톰 미니키트
-  gSoothingAmpoule:   '',   // G-수딩 앰플
-  brighteningAmpoule: '',   // 브라이트닝 앰플
-  rRefineAmpoule:     ''    // R-리파인 앰플
+  hyalstormMiniKit: 'https://flexkin.co.kr/product/detail.html?product_no=481&cate_no=56&display_group=1'   // 히알스톰 미니키트
 };
+/* 각 제품의 상세페이지는 아래 FLEXKIN_PRODUCTS의 link 칸에 있습니다. */
 
 /* 여러 관리에서 함께 쓰는 제품 */
 window.FLEXKIN_PRODUCTS = {
-  hsPeeling: { name:'히알스톰 필링',       shape:'bottle',  color:'#eaf3f7', cap:'#c8b28a', effect:'shimmer', image:'products/hsPeeling.webp', height:0.068, model:'' },
-  hsBooster: { name:'히알스톰 스킨부스터', shape:'dropper', color:'#dcecf4', cap:'#f4efe6', effect:'droplets', image:'products/hsBooster.webp', height:0.068, model:'' },
-  hsSerum:   { name:'히알스톰 세럼',       shape:'dropper', color:'#e6f1f6', cap:'#c8b28a', effect:'gloss', image:'products/hsSerum.webp', height:0.12, model:'' },
-  hsCream:   { name:'히알스톰 크림',       shape:'jar',     color:'#f2f7f9', cap:'#c8b28a', effect:'cream', image:'products/hsCream.webp', height:0.135, model:'' },
-  hsSun:     { name:'히알스톰 선크림',     shape:'tube',    color:'#f4f8fa', cap:'#c8b28a', effect:'veil', image:'products/hsSun.webp', height:0.115, model:'' },
-  gSoothing: { name:'G-수딩 앰플',         shape:'dropper', color:'#d7eadb', cap:'#f4efe6', effect:'droplets', image:'products/gSoothing.webp', height:0.14, model:'' },
-  coolModel: { name:'쿨 모델링',           shape:'pouch',   color:'#e9eef0', cap:'#dfe9ec', effect:'modeling', effectColor:'#81d5f4', image:'products/coolModel.webp', thumb:'products/coolModelBowl.webp', height:.2, model:'' },
-  collagen:  { name:'콜라겐 에센스',       shape:'bottle',  color:'#f4ebe2', cap:'#c8b28a', effect:'droplets', image:'products/collagen.webp', height:0.15, model:'' },
-  rejuver:   { name:'리쥬버 크림',         shape:'jar',     color:'#f3eee8', cap:'#c8b28a', effect:'cream', image:'products/rejuver.webp', height:0.15, model:'' },
-  brightAmp: { name:'브라이트닝 앰플',     shape:'dropper', color:'#f8efd6', cap:'#f4efe6', effect:'droplets', image:'products/brightAmp.webp', height:0.14, model:'' },
-  vitaModel: { name:'비타민 모델링',       shape:'pouch',   color:'#efeeea', cap:'#e9dcb8', effect:'modeling', effectColor:'#f1c3b6', image:'products/vitaModel.webp', thumb:'products/vitaModelBowl.webp', height:.2, model:'' },
-  rRefine:   { name:'R-리파인 앰플',       shape:'dropper', color:'#ece3ef', cap:'#f4efe6', effect:'gloss', image:'products/rRefine.webp', height:0.14, model:'' },
-  damiMask:  { name:'단미 마스크',         shape:'pouch',   color:'#f5ede3', cap:'#c8b28a', effect:'sheet', image:'products/damiMask.webp', height:0.165, model:'' }
+  hsPeeling: { name:'히알스톰 필링',       shape:'bottle',  color:'#eaf3f7', cap:'#c8b28a', effect:'shimmer', image:'products/hsPeeling.webp', height:0.068, link:'https://flexkin.co.kr/product/detail.html?product_no=345&cate_no=56&display_group=1', model:'' },
+  hsBooster: { name:'히알스톰 스킨부스터', shape:'dropper', color:'#dcecf4', cap:'#f4efe6', effect:'droplets', image:'products/hsBooster.webp', height:0.068, link:'https://flexkin.co.kr/product/detail.html?product_no=344&cate_no=56&display_group=1', model:'' },
+  hsSerum:   { name:'히알스톰 세럼',       shape:'dropper', color:'#e6f1f6', cap:'#c8b28a', effect:'gloss', image:'products/hsSerum.webp', height:0.12, link:'https://flexkin.co.kr/product/detail.html?product_no=362&cate_no=56&display_group=1', model:'' },
+  hsCream:   { name:'히알스톰 크림',       shape:'jar',     color:'#f2f7f9', cap:'#c8b28a', effect:'cream', image:'products/hsCream.webp', height:0.135, link:'https://flexkin.co.kr/product/detail.html?product_no=363&cate_no=56&display_group=1', model:'' },
+  hsSun:     { name:'히알스톰 선크림',     shape:'tube',    color:'#f4f8fa', cap:'#c8b28a', effect:'veil', image:'products/hsSun.webp', height:0.115, link:'https://flexkin.co.kr/product/detail.html?product_no=364&cate_no=56&display_group=1', model:'' },
+  gSoothing: { name:'G-수딩 앰플',         shape:'dropper', color:'#d7eadb', cap:'#f4efe6', effect:'droplets', image:'products/gSoothing.webp', height:0.14, link:'https://flexkin.co.kr/product/detail.html?product_no=496&cate_no=61&display_group=1', model:'' },
+  coolModel: { name:'쿨 모델링',           shape:'pouch',   color:'#e9eef0', cap:'#dfe9ec', effect:'modeling', effectColor:'#81d5f4', image:'products/coolModel.webp', thumb:'products/coolModelBowl.webp', height:.2, link:'https://flexkin.co.kr/product/detail.html?product_no=379&cate_no=61&display_group=1', model:'' },
+  collagen:  { name:'콜라겐 에센스',       shape:'bottle',  color:'#f4ebe2', cap:'#c8b28a', effect:'droplets', image:'products/collagen.webp', height:0.15, link:'https://flexkin.co.kr/product/detail.html?product_no=377&cate_no=46&display_group=1', model:'' },
+  rejuver:   { name:'리쥬버 크림',         shape:'jar',     color:'#f3eee8', cap:'#c8b28a', effect:'cream', image:'products/rejuver.webp', height:0.15, link:'https://flexkin.co.kr/product/detail.html?product_no=375&cate_no=46&display_group=1', model:'' },
+  brightAmp: { name:'브라이트닝 앰플',     shape:'dropper', color:'#f8efd6', cap:'#f4efe6', effect:'droplets', image:'products/brightAmp.webp', height:0.14, link:'https://flexkin.co.kr/product/detail.html?product_no=497&cate_no=61&display_group=1', model:'' },
+  vitaModel: { name:'비타민 모델링',       shape:'pouch',   color:'#efeeea', cap:'#e9dcb8', effect:'modeling', effectColor:'#f1c3b6', image:'products/vitaModel.webp', thumb:'products/vitaModelBowl.webp', height:.2, link:'https://flexkin.co.kr/product/detail.html?product_no=386&cate_no=61&display_group=1', model:'' },
+  rRefine:   { name:'R-리파인 앰플',       shape:'dropper', color:'#ece3ef', cap:'#f4efe6', effect:'gloss', image:'products/rRefine.webp', height:0.14, link:'https://flexkin.co.kr/product/detail.html?product_no=498&cate_no=61&display_group=1', model:'' },
+  damiMask:  { name:'단미 마스크',         shape:'pouch',   color:'#f5ede3', cap:'#c8b28a', effect:'sheet', image:'products/damiMask.webp', height:0.165, link:'https://flexkin.co.kr/product/detail.html?product_no=378&cate_no=46&display_group=1', model:'' }
 };
 
 /* 피부 고민 → 관리 프로그램 (버튼 순서 = 배열 순서) */
@@ -332,8 +335,8 @@ window.FLEXKIN_CARE = [
         '필링과 스킨부스터가 하나씩 들어 있는 히알스톰 미니키트로 피부 상태에 맞춰 추가 관리하는 것도 추천드립니다.'
       ],
       recommend: [
-        { label:'히알스톰 3종 애프터케어', link:'hyalstormAftercare', product:'' },
-        { label:'히알스톰 미니키트',       link:'hyalstormMiniKit',   product:'' }
+        { label:'히알스톰 3종 애프터케어', group:['hsSerum','hsCream','hsSun'] },   // 세 제품에 각각 추천 표시
+        { label:'히알스톰 미니키트',       link:'hyalstormMiniKit' }
       ]
     }
   },
@@ -356,7 +359,7 @@ window.FLEXKIN_CARE = [
         '오늘의 편안한 피부 컨디션을 오래 유지하고 싶으시다면 플렉스킨 G-수딩 앰플을 아침과 저녁에 사용해 보세요!',
         '피부 상태에 맞는 적정량으로 꾸준히 관리하시는 것을 추천드립니다.'
       ],
-      recommend: [ { label:'G-수딩 앰플', link:'gSoothingAmpoule', product:'gSoothing' } ]
+      recommend: [ { label:'G-수딩 앰플', product:'gSoothing' } ]
     }
   },
   {
@@ -379,7 +382,7 @@ window.FLEXKIN_CARE = [
         '맑고 균일한 피부 톤을 꾸준히 관리하고 싶으시다면 플렉스킨 브라이트닝 앰플을 아침과 저녁에 사용해 보세요!',
         '낮에는 자외선 차단도 잊지 마세요.'
       ],
-      recommend: [ { label:'브라이트닝 앰플', link:'brighteningAmpoule', product:'brightAmp' } ]
+      recommend: [ { label:'브라이트닝 앰플', product:'brightAmp' } ]
     }
   },
   {
@@ -402,7 +405,7 @@ window.FLEXKIN_CARE = [
         '탄력 있고 촉촉한 피부를 꾸준히 관리하고 싶으시다면 플렉스킨 R-리파인 앰플을 아침과 저녁에 사용해 보세요!',
         '피부 상태에 맞는 적정량으로 꾸준히 관리하는 것을 추천드립니다.'
       ],
-      recommend: [ { label:'R-리파인 앰플', link:'rRefineAmpoule', product:'rRefine' } ]
+      recommend: [ { label:'R-리파인 앰플', product:'rRefine' } ]
     }
   }
 ];
@@ -1230,17 +1233,21 @@ window.FLEXKIN_SESSION = {
     gid('fTitle').textContent = SES.finaleTitle || '오늘의 FLEXKIN 관리가 완료되었습니다.';
     gid('fHome').replaceChildren(...(c.homecare.text || []).map(t=>Object.assign(document.createElement('p'), {textContent:t})));
     const recs = c.homecare.recommend || [];
-    const recIds = new Set(recs.map(r=>r.product).filter(Boolean));
+    const recIds = new Set(recs.flatMap(r=>r.group || (r.product ? [r.product] : [])));
+    const okUrl = u => typeof u === 'string' && /^https:\/\//.test(u) ? u : '';
+    const urlOf = id => okUrl((CATALOG[id] || {}).link);
+    const recUrl = r => r.group ? urlOf(r.group[0]) : r.product ? urlOf(r.product) : okUrl(LINKS[r.link]);
     const used = c.steps.map(s=>s.product).filter((v, i, a)=>a.indexOf(v) === i);
-    const chips = used.map(id=>({ name:(CATALOG[id] || {}).name || id, image:(CATALOG[id] || {}).image || '', rec:recIds.has(id) }))
-      .concat(recs.filter(r=>!r.product || !used.includes(r.product)).map(r=>({ name:r.label, rec:true })));
+    const chips = used.map(id=>({ name:(CATALOG[id] || {}).name || id, image:(CATALOG[id] || {}).image || '', rec:recIds.has(id), url:urlOf(id) }))
+      .concat(recs.filter(r=>!r.group && (!r.product || !used.includes(r.product))).map(r=>({ name:r.label, rec:true, url:recUrl(r) })));
     gid('fUsed').replaceChildren(...chips.map(ch=>{
-      const t = document.createElement('div'); t.className = 'f-tile' + (ch.rec ? ' rec' : '') + (ch.image ? '' : ' text');
+      const t = document.createElement(ch.url ? 'a' : 'div'); t.className = 'f-tile' + (ch.rec ? ' rec' : '') + (ch.image ? '' : ' text');
+      if (ch.url){ t.href = ch.url; t.target = '_blank'; t.rel = 'noopener'; t.setAttribute('aria-label', `${ch.name} 상세페이지 열기`); }
       if (ch.image){ const im = document.createElement('img'); im.src = ch.image; im.alt = ''; im.loading = 'lazy'; t.append(im); }
       const n = document.createElement('span'); n.textContent = ch.name; t.append(n);
       if (ch.rec){ const b = document.createElement('em'); b.textContent = '추천'; t.append(b); }
       return t; }));
-    const link = recs.map(r=>LINKS[r.link]).find(u=>typeof u === 'string' && /^https?:\/\//.test(u));
+    const link = recs.map(recUrl).find(Boolean);
     const a = gid('fProduct'); if (link){ a.href = link; a.removeAttribute('aria-disabled'); } else { a.removeAttribute('href'); a.setAttribute('aria-disabled','true'); }
     finaleEl.hidden = false; gid('fInner').scrollTop = 0;
     // the one advertising moment: the products used today, softly lit on the display
