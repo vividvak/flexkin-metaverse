@@ -10,18 +10,6 @@
 body{margin:0;font:14px/1.5 system-ui,-apple-system,sans-serif}
 img{max-width:100%}
 </style>
-<meta property="og:type" content="website">
-<meta property="og:url" content="https://vividvak.github.io/flexkin-metaverse/">
-<meta property="og:title" content="EXPERT FLEXKIN 3D 힐링 관리실">
-<meta property="og:description" content="피부 고민을 고르면 잔잔한 음악과 함께 관리가 이어집니다.">
-<meta property="og:image" content="https://vividvak.github.io/flexkin-metaverse/og.png">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://vividvak.github.io/flexkin-metaverse/og.png">
-<link rel="icon" type="image/png" href="favicon.png">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
-<meta name="theme-color" content="#f8f4ec">
 <title>플렉스킨 관리실</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1264,8 +1252,7 @@ window.FLEXKIN_SESSION = {
   const playerEl = gid('player'), trackEl = gid('pTrack'), timeEl = gid('pTime');
   const finaleEl = gid('finale');
   let session = null;
-  const AUDIO_LEVEL = .32;
-  const audio = { ctx:null, master:null, on:true };
+  const audio = { ctx:null, master:null, on:true, missing:false, started:false };
   try { audio.on = localStorage.getItem('flexkin-music') !== 'off'; } catch(e){}
   const sessionOwnsFace = () => !!(session && !session.ended);
   // 0 → 1 across the care steps (the intro keeps the concern fully visible)
@@ -1320,7 +1307,7 @@ window.FLEXKIN_SESSION = {
     session.i++; session.t = 0;
     if (session.i >= session.lines.length){ showFinale(); return; }
     const l = session.lines[session.i];
-    if (l.stepStart){ session.effect = l.effect; session.effectT = 0; chime(); highlightProducts({ [l.product]:1 });
+    if (l.stepStart){ session.effect = l.effect; session.effectT = 0; highlightProducts({ [l.product]:1 });
       if (!session.userMoved) glideTo(FACE_VIEWS[(l.group - 1) % FACE_VIEWS.length]); }
     if (l.group === 0) highlightProducts(null);
     if (l.group === session.c.steps.length + 1){ session.effect = null; highlightProducts(null);
@@ -1397,7 +1384,7 @@ window.FLEXKIN_SESSION = {
   gid('pSound').addEventListener('click', toggleMusic);
   gid('musicBtn').addEventListener('click', toggleMusic);
   function setSoundIcon(){
-    const playing = audio.on && !!audio.master;
+    const playing = audio.on && audio.started && !audio.missing;
     const mb = gid('musicBtn'); mb.setAttribute('aria-pressed', String(playing)); mb.setAttribute('aria-label', playing ? '음악 끄기' : '음악 켜기');
     mb.querySelector('span').textContent = playing ? '음악 끄기' : '음악 켜기';
     mb.classList.toggle('on', playing);
@@ -1411,103 +1398,114 @@ window.FLEXKIN_SESSION = {
   gid('fProduct').addEventListener('click', e=>{ if (!gid('fProduct').getAttribute('href')){ e.preventDefault(); toast('공식 제품 페이지는 준비 중이에요. 링크가 연결되면 이 버튼에서 바로 보실 수 있어요.'); } });
   addEventListener('keydown', e=>{ if (e.key === 'Escape' && session) endSession(); });
 
-  /* ---------- music: a calm, simple melody (A minor pentatonic) over a soft pad, all synthesized ----------
-     It starts with the first touch on the page (browsers block sound before that) and keeps
-     playing from the lounge through the care session; the level only shifts between them. */
-  const NOTE = { G4:392.00, A4:440.00, C5:523.25, D5:587.33, E5:659.25, G5:783.99, E4:329.63 };
-  const BEAT = .9;                                         // seconds per beat (about 66 bpm)
-  const PHRASES = [
-    [['E5',2],['D5',1],['C5',1],['A4',3],[null,1],['C5',1],['D5',1],['E5',2],['G4',3],[null,1],['A4',2],['C5',1],['D5',1],['C5',2],['A4',4],[null,2]],
-    [['E5',2],['G5',1],['E5',1],['D5',3],[null,1],['C5',1],['D5',1],['E5',2],['A4',3],[null,1],['G4',2],['A4',1],['C5',1],['E4',2],['A4',4],[null,2]],
-  ];
+  /* ---------- music: one licensed ambient recording for the whole space ----------
+     Put the file at music/flexkin-spa.mp3 (next to index.html). It starts after the first touch
+     (browsers block sound before that), fades in over 3 s, plays at a low level everywhere —
+     lounge, care and closing card alike — and never restarts when the guest moves or a step changes.
+     The end of the track crossfades into its start so the loop point is not heard.
+     If the file is missing or cannot load, the music buttons hide and nothing else is affected. */
+  const MUSIC_SRC = 'music/flexkin-spa.mp3';
+  const MUSIC_LEVEL = .18;                                 // about 18 % of full volume
+  const FADE_IN = 3, FADE_OUT = 1.5, LOOP_XFADE = 6;       // seconds
+  audio.els = [0, 1].map(k=>{
+    const el = new Audio(); el.preload = k ? 'none' : 'metadata'; el.src = MUSIC_SRC; el.playsInline = true;
+    el.setAttribute('playsinline', ''); el.volume = 0;
+    el.addEventListener('error', ()=>{ if (k === 0 || !audio.started) musicMissing(); });
+    return el;
+  });
+  audio.cur = 0;
+  function musicMissing(){
+    if (audio.missing) return;
+    audio.missing = true; audio.started = false;
+    audio.els.forEach(el=>{ try { el.pause(); } catch(e){} });
+    ['musicBtn', 'pSound'].forEach(id=>{ const b = gid(id); if (b) b.hidden = true; });
+    setSoundIcon();
+  }
   function audioStart(){
+    if (audio.missing) return;
     try {
-      const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
-      if (!audio.ctx) audio.ctx = new AC();
-      const ctx = audio.ctx; if (ctx.state === 'suspended') ctx.resume();
-      if (audio.master) return;                            // already built: just resumed
-      const master = audio.master = ctx.createGain(); master.gain.value = 0; master.connect(ctx.destination);
-      // a soft hall: generated impulse response
-      const rl = Math.floor(ctx.sampleRate * 3.2), ir = ctx.createBuffer(2, rl, ctx.sampleRate);
-      for (let c=0;c<2;c++){ const d = ir.getChannelData(c); for (let i=0;i<rl;i++) d[i] = (Math.random()*2 - 1) * Math.pow(1 - i/rl, 3.2); }
-      const verb = audio.verb = ctx.createConvolver(); verb.buffer = ir;
-      const wet = ctx.createGain(); wet.gain.value = .5; verb.connect(wet); wet.connect(master);
-      // room air: brown noise through a low-pass (a little stronger during care)
-      const len = ctx.sampleRate * 4, buf = ctx.createBuffer(1, len, ctx.sampleRate), nd = buf.getChannelData(0);
-      let last = 0; for (let i=0;i<len;i++){ const w = Math.random()*2 - 1; last = (last + .02*w) / 1.02; nd[i] = last * 3.2; }
-      const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
-      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420;
-      const air = audio.air = ctx.createGain(); air.gain.value = .12;
-      src.connect(lp); lp.connect(air); air.connect(master); src.start();
-      // slow breathing pad on A minor (A, E, A, C)
-      [110, 164.81, 220, 261.63].forEach((f, i)=>{
-        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
-        const g = ctx.createGain(); g.gain.value = .04;
-        const l = ctx.createOscillator(); l.frequency.value = .04 + i*.025; const lg = ctx.createGain(); lg.gain.value = .025;
-        l.connect(lg); lg.connect(g.gain); o.connect(g); g.connect(master); g.connect(verb); o.start(); l.start();
-      });
-      // melody bus with a gentle echo
-      const mel = audio.mel = ctx.createGain(); mel.gain.value = 1; mel.connect(master); mel.connect(verb);
-      const dl = ctx.createDelay(2); dl.delayTime.value = BEAT * .75;
-      const fb = ctx.createGain(); fb.gain.value = .3; const dlp = ctx.createBiquadFilter(); dlp.type = 'lowpass'; dlp.frequency.value = 1800;
-      const echo = ctx.createGain(); echo.gain.value = .35;
-      mel.connect(dl); dl.connect(dlp); dlp.connect(fb); fb.connect(dl); dlp.connect(echo); echo.connect(master);
-      audio.next = ctx.currentTime + .8; audio.step = 0;
-      audio.timer = setInterval(scheduleMelody, 200);
-    } catch(e){}
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC && !audio.ctx){
+        const ctx = audio.ctx = new AC();
+        const master = audio.master = ctx.createGain(); master.gain.value = 0; master.connect(ctx.destination);
+        audio.gains = audio.els.map((el, k)=>{
+          const g = ctx.createGain(); g.gain.value = k === audio.cur ? 1 : 0;
+          ctx.createMediaElementSource(el).connect(g); g.connect(master); el.volume = 1;
+          return g;
+        });
+      }
+      if (audio.ctx && audio.ctx.state === 'suspended') audio.ctx.resume();
+    } catch(e){ audio.ctx = null; audio.master = null; audio.gains = null; }
+    const el = audio.els[audio.cur];
+    const p = el.play();
+    if (p && p.catch) p.catch(()=>{ /* blocked or failed: stay quiet, the button still works */ });
+    audio.started = true;
+    if (!audio.timer) audio.timer = setInterval(loopWatch, 250);
   }
-  function playNote(f, t, dur){
-    const ctx = audio.ctx;
-    [[f, 'sine', 1], [f / 2, 'triangle', .3]].forEach(([fr, type, amt])=>{
-      const o = ctx.createOscillator(); o.type = type; o.frequency.value = fr;
-      const g = ctx.createGain();
-      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.065 * amt, t + .08);
-      g.gain.exponentialRampToValueAtTime(.035 * amt, t + .6); g.gain.exponentialRampToValueAtTime(.0001, t + dur + 2.2);
-      o.connect(g); g.connect(audio.mel); o.start(t); o.stop(t + dur + 2.4);
-    });
+  // crossfade the end of the track into a fresh start on the second player
+  function loopWatch(){
+    if (!audio.started || !audio.on || audio.missing || audio.xfading) return;
+    const a = audio.els[audio.cur], d = a.duration;
+    if (!isFinite(d) || d <= 0) return;
+    if (d < LOOP_XFADE * 3){ a.loop = true; return; }     // short clip: plain loop
+    if (a.currentTime < d - LOOP_XFADE) return;
+    const nk = 1 - audio.cur, b = audio.els[nk];
+    audio.xfading = true;
+    b.preload = 'auto'; try { b.currentTime = 0; } catch(e){}
+    const p = b.play(); if (p && p.catch) p.catch(()=>{});
+    const t0 = performance.now();
+    const step = ()=>{
+      const f = Math.min(1, (performance.now() - t0) / (LOOP_XFADE * 1000));
+      // equal-power curve keeps the level steady through the overlap
+      const ga = Math.cos(f * Math.PI / 2), gb = Math.sin(f * Math.PI / 2);
+      if (audio.gains){ audio.gains[audio.cur].gain.value = ga; audio.gains[nk].gain.value = gb; }
+      else { a.volume = ga * masterLevel(); b.volume = gb * masterLevel(); }
+      if (f < 1) requestAnimationFrame(step);
+      else { a.pause(); audio.cur = nk; audio.xfading = false; }
+    };
+    requestAnimationFrame(step);
   }
-  function scheduleMelody(){
-    const ctx = audio.ctx; if (!ctx || ctx.state !== 'running') return;
-    if (audio.next < ctx.currentTime) audio.next = ctx.currentTime + .1;
-    while (audio.next < ctx.currentTime + 1.2){
-      const total = PHRASES[0].length, seq = PHRASES[Math.floor(audio.step / total) % PHRASES.length], [n, beats] = seq[audio.step % total];
-      if (n && audio.on) playNote(NOTE[n], audio.next, beats * BEAT);
-      audio.next += beats * BEAT; audio.step++;
+  // fallback level for browsers without Web Audio
+  let fallbackLevel = 0;
+  function masterLevel(){ return audio.master ? 1 : fallbackLevel; }
+  // the level is the same everywhere; this only fades in and out
+  function applyLevel(){
+    if (!audio.started || audio.missing) return;
+    const target = audio.on ? MUSIC_LEVEL : 0, secs = audio.on ? FADE_IN : FADE_OUT;
+    if (audio.master && audio.ctx){
+      const g = audio.master.gain, now = audio.ctx.currentTime;
+      g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(target, now + secs);
+    } else {
+      const from = fallbackLevel, t0 = performance.now();
+      const step = ()=>{ const f = Math.min(1, (performance.now() - t0) / (secs * 1000));
+        fallbackLevel = from + (target - from) * f; audio.els[audio.cur].volume = fallbackLevel; if (f < 1) requestAnimationFrame(step); };
+      requestAnimationFrame(step);
     }
+    clearTimeout(audio.pauseT);
+    if (!audio.on) audio.pauseT = setTimeout(()=>{ if (!audio.on) audio.els.forEach(el=>el.pause()); }, secs * 1000 + 100);
   }
-  // lounge, care and closing card share the music; only the level moves
-  function applyLevel(tc = 1.5){
-    if (!audio.ctx || !audio.master) return;
-    const inCare = session && !session.ended && !session.finale;
-    audio.master.gain.setTargetAtTime(audio.on ? (inCare ? AUDIO_LEVEL : .26) : 0, audio.ctx.currentTime, tc);
-    audio.air.gain.setTargetAtTime(inCare ? .3 : .12, audio.ctx.currentTime, tc);
-  }
-  function audioFade(){ applyLevel(); }
+  function audioFade(){}
   function toggleMusic(){
-    if (!audio.master){ audio.on = true; audioStart(); }
-    else audio.on = !audio.on;
+    if (audio.missing) return;
+    audio.on = audio.started ? !audio.on : true;
     try { localStorage.setItem('flexkin-music', audio.on ? 'on' : 'off'); } catch(e){}
-    applyLevel(.5); setSoundIcon();
+    if (audio.on) audioStart();
+    applyLevel(); setSoundIcon();
   }
   // the first touch anywhere starts the music (unless the guest turned it off before)
   function firstTouch(e){
     if (e.target && e.target.closest && e.target.closest('#musicBtn, #pSound')) return;
     removeEventListener('pointerdown', firstTouch, true); removeEventListener('keydown', firstTouch, true);
-    if (audio.on){ audioStart(); applyLevel(2.5); }
+    if (audio.on && !audio.started){ audioStart(); applyLevel(); }
     setSoundIcon();
   }
   addEventListener('pointerdown', firstTouch, true); addEventListener('keydown', firstTouch, true);
+  // pause while the tab is hidden, pick up from the same spot when it returns
   document.addEventListener('visibilitychange', ()=>{
-    if (!audio.ctx) return;
-    if (document.hidden) audio.ctx.suspend(); else if (audio.on) audio.ctx.resume();
+    if (!audio.started || audio.missing) return;
+    if (document.hidden){ audio.els.forEach(el=>el.pause()); if (audio.ctx) audio.ctx.suspend(); }
+    else if (audio.on){ if (audio.ctx) audio.ctx.resume(); const p = audio.els[audio.cur].play(); if (p && p.catch) p.catch(()=>{}); }
   });
-  function chime(){
-    if (!audio.ctx || !audio.master || !audio.on) return;
-    const ctx = audio.ctx, t = ctx.currentTime;
-    [659.25, 987.77].forEach((f, i)=>{ const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
-      const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.05/(i + 1), t + .03); g.gain.exponentialRampToValueAtTime(.0001, t + 3.2);
-      o.connect(g); g.connect(audio.master); g.connect(audio.verb); o.start(t); o.stop(t + 3.3); });
-  }
 
   /* ---------- camera glides (the viewer can still drag at any time) ---------- */
   // the opening view: framed on the customer lying on the bed (a little wider on narrow phones)
@@ -2026,7 +2024,7 @@ window.FLEXKIN_SESSION = {
     requestAnimationFrame(tick);
   }
   updateUI();
-  setTimeout(()=>{ if (audio.on && !audio.master) toast('화면을 한 번 누르시면 잔잔한 음악이 흘러요'); }, 2600);
+  setTimeout(()=>{ if (audio.on && !audio.started && !audio.missing) toast('화면을 한 번 누르시면 잔잔한 음악이 흘러요'); }, 2600);
   tick();
   document.getElementById('loading').classList.add('done');
 
