@@ -1111,7 +1111,7 @@ window.FLEXKIN_SESSION = {
   // lying: face centre over the headrest; the head tilts up a little on the pillow (see animateAvatar)
   function bedPose(b){ return { key:'b'+b, pos:new THREE.Vector3(beds[b].x, .88, BED_Z - .58 + FACE_UP), quat:qLie.clone(), lie:1 }; }
   // arriving guest: stands a little way from the bed, back to the camera, looking at it
-  function entryPose(){ return { key:'entry', pos:new THREE.Vector3(.2, 0, -.25), quat:new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI - .12, 0)), lie:0 }; }   // just in front of the bed foot
+  function entryPose(){ return { key:'entry', pos:new THREE.Vector3(.2, 0, -.25), quat:new THREE.Quaternion().setFromEuler(new THREE.Euler(0, .28, 0)), lie:0 }; }   // just in front of the bed foot, facing the guest's camera
   // waiting spots around the bed, all inside the opening view
   // first four are fully in frame on every screen size and never cover the lying customer; the rest are overflow
   const LOUNGE = [[.75,-.65],[-.75,-1.1],[.75,-1.7],[0,-.2],[-1.5,-.4],[1.5,-.3],[-.5,.35],[.6,.4],[-1.6,-1.6],[1.65,-1.95]];
@@ -2310,7 +2310,7 @@ window.FLEXKIN_SESSION = {
     const br = Math.sin(t*(closedEyes ? .9 : 1.6) + av.seed);
     av.body.scale.set(1 + br*(closedEyes ? .012 : .006), 1, 1 + br*(closedEyes ? .018 : .006));
     tmp.copy(camera.position); av.ch.worldToLocal(tmp);
-    const lim = av.lie > .6 ? .4 : .6, facingAway = av.to && av.to.key === 'entry';
+    const lim = av.lie > .6 ? .4 : .6, facingAway = false;
     const yaw = facingAway ? 0 : Math.max(-lim, Math.min(lim, Math.atan2(tmp.x, tmp.z)));
     av.head.rotation.y += (yaw - av.head.rotation.y)*.06;
     av.head.rotation.x += ((av.lie > .5 ? .3 : 0) - av.head.rotation.x)*.08;   // head propped on the pillow
