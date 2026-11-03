@@ -64,7 +64,8 @@ button{font-family:inherit;}
 .music.on .eq b:nth-child(2){animation-delay:-.5s;} .music.on .eq b:nth-child(3){animation-delay:-1s;}
 @keyframes eq{0%,100%{height:4px}50%{height:12px}}
 @media (prefers-reduced-motion: reduce){ .music.on .eq b{animation:none;height:9px;} }
-@media (max-width:420px){ .music span{display:none;} .music{padding:0 11px;} }
+@media (max-width:420px){ .music span{display:none;} .music{padding:0 11px;} .share span{display:inline;} }
+.share svg{width:15px;height:15px;color:var(--gold);flex:none;}
 .chev{width:7px;height:7px;border-right:1.5px solid var(--p-muted);border-bottom:1.5px solid var(--p-muted);transform:rotate(45deg) translateY(-2px);display:block;}
 .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#6fbf8a;margin-right:5px;vertical-align:1px;}
 .dot.off{background:#c9bca9;}
@@ -210,6 +211,7 @@ a.f-tile:focus-visible{outline:2px solid #dcc18f;outline-offset:2px;}
 <div class="top">
   <div class="brand"><small>EXPERT</small><b>FLEXKIN</b></div>
   <div class="top-r">
+  <button class="music share" id="shareBtn" type="button" aria-label="친구에게 공유하기"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 10V2.5M5 5.2 8 2.3l3 2.9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.5 7.5H3.8a1.3 1.3 0 0 0-1.3 1.3v4.4c0 .7.6 1.3 1.3 1.3h8.4c.7 0 1.3-.6 1.3-1.3V8.8c0-.7-.6-1.3-1.3-1.3h-.7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>친구에게 공유</span></button>
   <button class="music" id="musicBtn" type="button" aria-pressed="false" aria-label="음악 켜기"><i class="eq" aria-hidden="true"><b></b><b></b><b></b></i><span>음악 켜기</span></button>
   <button class="room" id="roomBtn" type="button" aria-haspopup="dialog" hidden><span>관리실 <em id="roomNo">01</em> <i class="chev" aria-hidden="true"></i></span><small><i class="dot off" id="dot"></i><em id="count">1명</em> 함께 있어요</small></button>
   </div>
@@ -1412,6 +1414,14 @@ window.FLEXKIN_SESSION = {
   gid('pEnd').addEventListener('click', endSession);
   gid('pSound').addEventListener('click', toggleMusic);
   gid('musicBtn').addEventListener('click', toggleMusic);
+  // share with a friend: the phone's share sheet where there is one, otherwise copy the link
+  const SHARE_URL = 'https://vividvak.github.io/flexkin-metaverse/';
+  gid('shareBtn').addEventListener('click', async ()=>{
+    const data = { title:'EXPERT FLEXKIN 3D 힐링 관리실', text:'피부 고민을 고르면 3분 동안 잔잔한 음악과 함께 관리가 이어져요.', url:SHARE_URL };
+    if (navigator.share){ try { await navigator.share(data); return; } catch(e){ if (e && e.name === 'AbortError') return; } }
+    try { await navigator.clipboard.writeText(SHARE_URL); toast('링크를 복사했어요. 친구에게 붙여 넣어 보내 주세요'); }
+    catch(e){ toast('이 주소를 친구에게 보내 주세요: ' + SHARE_URL); }
+  });
   function setSoundIcon(){
     const playing = audio.on && audio.started && !audio.missing;
     const mb = gid('musicBtn'); mb.setAttribute('aria-pressed', String(playing)); mb.setAttribute('aria-label', playing ? '음악 끄기' : '음악 켜기');
