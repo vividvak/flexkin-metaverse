@@ -1738,24 +1738,316 @@ window.FLEXKIN_SESSION = {
     [prodSprite, ...fallSprites].forEach(sp=>sp.material.opacity *= k);
   }
 
+  /* ---------- the therapist's hands ----------
+     Only the hands come into frame (with a fan brush or a cotton pad for the peel). They touch the
+     skin exactly where the formula goes on: the layer is painted along the path the fingertips,
+     brush or palms travel, and it thins and sinks in gradually. Every step has its own movement,
+     tempo and camera, timed to the length of that step's narration.
+     Moves: h = R | L | B (both, the left mirrored), m = tip | palm | brush | pad,
+     u = [start, end] as a fraction of the step, path in face-layer pixels (256 x 256),
+     dir = where the fingers point, taps = light pats, press = hold still with gentle pressure,
+     p = what the move leaves on the skin {k: line | dab | wipe, w, a, fade:[u0,u1], floor, grow}. */
+  const HM = (pts)=>pts.map(([x, y])=>[FX - x, y]);
+  const circ = (cx, cy, r, turns, ph=0, n=44)=>Array.from({ length:n + 1 }, (_, i)=>{ const a = ph + i / n * turns * Math.PI * 2; return [cx + Math.cos(a) * r, cy + Math.sin(a) * r * .9]; });
+  const zig = (a, b, amp, n)=>{ const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1, nx = -dy / l, ny = dx / l, out = [];
+    for (let i=0;i<=n;i++){ const f = i / n, s = i && i < n ? (i % 2 ? amp : -amp) : 0; out.push([a[0] + dx * f + nx * s, a[1] + dy * f + ny * s]); } return out; };
+  const CHEEK_R = [[152,160],[208,154],[154,178],[210,176],[158,198],[204,204]];   // below the eye, clear of the lips
+  const PEEL_LINE = { k:'line', w:20, a:.3 };
+  const WIPE = { k:'wipe', w:48 };
+  const CHOREO = {
+    // STEP 필링 — fan brush: cheeks, forehead, nose, chin; then a soft pad wipes it off
+    shimmer: { cam:'peel', col:'#eef6fa', moves:[
+      { h:'R', m:'brush', u:[.05,.2],  path:CHEEK_R, p:PEEL_LINE },
+      { h:'R', m:'brush', u:[.24,.39], path:HM(CHEEK_R), p:PEEL_LINE },
+      { h:'R', m:'brush', u:[.43,.55], path:[[82,52],[174,48],[86,72],[170,70]], p:PEEL_LINE },
+      { h:'R', m:'brush', u:[.58,.64], path:[[128,92],[128,140]], p:PEEL_LINE },
+      { h:'R', m:'brush', u:[.67,.75], path:[[102,220],[154,220],[110,236],[146,236]], p:PEEL_LINE },
+      { h:'R', m:'pad',   u:[.81,.85], path:[[76,58],[180,54],[84,74],[172,72]], p:WIPE },
+      { h:'R', m:'pad',   u:[.86,.9],  path:[[150,160],[212,166],[154,192],[206,202]], p:WIPE },
+      { h:'R', m:'pad',   u:[.91,.95], path:HM([[150,160],[212,166],[154,192],[206,202]]), p:WIPE },
+      { h:'R', m:'pad',   u:[.955,.985], path:[[128,92],[128,140],[104,224],[152,228]], p:WIPE },
+    ]},
+    // STEP 스킨부스터 — a little on the fingertips, dotted on, spread from the centre outward, then patted in
+    droplets: { cam:'front', col:'#e4f2fb', bead:true, moves:[
+      { h:'R', m:'tip', u:[.06,.12], path:[[178,156]], p:{ k:'dab', w:13, a:.6, fade:[.3,.4] } },
+      { h:'L', m:'tip', u:[.12,.18], path:[[78,156]],  p:{ k:'dab', w:13, a:.6, fade:[.3,.4] } },
+      { h:'R', m:'tip', u:[.2,.26],  path:[[128,46]],  p:{ k:'dab', w:13, a:.6, fade:[.5,.58] } },
+      { h:'B', m:'tip', u:[.3,.37],  path:[[152,160],[182,162],[208,164]], p:{ k:'line', w:22, a:.24, fade:[.68,.95], floor:.3 } },
+      { h:'B', m:'tip', u:[.39,.46], path:[[156,184],[182,188],[206,192]], p:{ k:'line', w:22, a:.24, fade:[.68,.95], floor:.3 } },
+      { h:'B', m:'tip', u:[.5,.6],   path:[[142,46],[166,42],[190,46]],    p:{ k:'line', w:22, a:.24, fade:[.68,.95], floor:.3 } },
+      { h:'B', m:'tip', u:[.65,.9],  path:[[160,140],[188,150],[198,172],[176,184]], taps:9 },
+    ]},
+    // STEP 세럼 — long, slow glides: beside the nose out to the cheekbone, forehead out to the temples, palms to finish
+    gloss: { cam:'serum', col:'#eaf4f8', bead:true, moves:[
+      { h:'B', m:'tip', u:[.04,.1],   path:[[152,150]], p:{ k:'dab', w:11, a:.5, fade:[.14,.22] } },
+      { h:'B', m:'tip', u:[.14,.27],  path:[[150,150],[172,141],[196,133],[214,128]], p:{ k:'line', w:24, a:.24, fade:[.6,.95], floor:.35 } },
+      { h:'B', m:'tip', u:[.3,.42],   path:[[150,170],[176,163],[200,155],[216,148]], p:{ k:'line', w:24, a:.24, fade:[.6,.95], floor:.35 } },
+      { h:'B', m:'tip', u:[.45,.55],  path:[[160,198],[182,190],[202,178],[216,166]], p:{ k:'line', w:24, a:.24, fade:[.6,.95], floor:.35 } },
+      { h:'B', m:'tip', u:[.58,.69],  path:[[142,50],[166,48],[192,54]], p:{ k:'line', w:24, a:.24, fade:[.7,.95], floor:.35 } },
+      { h:'B', m:'tip', u:[.71,.79],  path:[[142,72],[166,72],[188,80]], p:{ k:'line', w:24, a:.24, fade:[.75,.95], floor:.35 } },
+      { h:'B', m:'palm', u:[.83,.95], path:[[184,164]], press:true },
+    ]},
+    // STEP 크림 — dotted on, small circles on each area, then both hands sweep up to the temples and cradle the cheeks
+    cream: { cam:'cream', col:'#fffaf3', bead:true, big:true, moves:[
+      { h:'R', m:'tip', u:[.03,.07], path:[[182,160]], p:{ k:'dab', w:15, a:.95, fade:[.2,.3] } },
+      { h:'L', m:'tip', u:[.07,.11], path:[[74,160]],  p:{ k:'dab', w:15, a:.95, fade:[.31,.41] } },
+      { h:'R', m:'tip', u:[.11,.15], path:[[128,48]],  p:{ k:'dab', w:15, a:.95, fade:[.42,.5] } },
+      { h:'R', m:'tip', u:[.15,.19], path:[[128,224]], p:{ k:'dab', w:13, a:.95, fade:[.51,.58] } },
+      { h:'R', m:'tip', u:[.2,.3],   path:circ(182,160,9,2.5,Math.PI),  p:{ k:'line', w:9, a:.8, fade:[.6,.9], floor:.16, grow:2.4 } },
+      { h:'L', m:'tip', u:[.31,.41], path:circ(74,160,9,2.5,0),        p:{ k:'line', w:9, a:.8, fade:[.6,.9], floor:.16, grow:2.4 } },
+      { h:'R', m:'tip', u:[.42,.5],  path:circ(128,48,10,2.5,Math.PI/2), p:{ k:'line', w:9, a:.8, fade:[.62,.9], floor:.16, grow:2.4 } },
+      { h:'R', m:'tip', u:[.51,.58], path:circ(128,224,7,2,-Math.PI/2),  p:{ k:'line', w:9, a:.8, fade:[.62,.9], floor:.16, grow:2.4 } },
+      { h:'B', m:'palm', u:[.63,.73], path:[[168,196],[194,164],[212,126]] },
+      { h:'B', m:'palm', u:[.75,.83], path:[[166,190],[192,160],[210,122]] },
+      { h:'B', m:'palm', u:[.86,.95], path:[[186,160]], press:true },
+    ]},
+    // STEP 선크림 — dotted on five areas, spread outward in short strokes, then blended along the nose and jawline
+    veil: { cam:'sun', col:'#fffdf8', bead:true, big:true, moves:[
+      { h:'R', m:'tip', u:[.03,.06], path:[[128,46]],  p:{ k:'dab', w:10, a:.85, fade:[.2,.27] } },
+      { h:'R', m:'tip', u:[.07,.1],  path:[[180,158]], p:{ k:'dab', w:10, a:.85, fade:[.29,.37] } },
+      { h:'L', m:'tip', u:[.07,.1],  path:[[76,158]],  p:{ k:'dab', w:10, a:.85, fade:[.29,.37] } },
+      { h:'R', m:'tip', u:[.11,.14], path:[[128,112]], p:{ k:'dab', w:9,  a:.85, fade:[.46,.54] } },
+      { h:'R', m:'tip', u:[.15,.18], path:[[128,224]], p:{ k:'dab', w:9,  a:.85, fade:[.68,.78] } },
+      { h:'B', m:'tip', u:[.2,.27],  path:[[140,46],[164,44],[190,48]],    p:{ k:'line', w:18, a:.34, fade:[.6,.95], floor:.2 } },
+      { h:'B', m:'tip', u:[.29,.35], path:[[150,150],[178,152],[206,156]], p:{ k:'line', w:18, a:.34, fade:[.6,.95], floor:.2 } },
+      { h:'B', m:'tip', u:[.36,.42], path:[[150,172],[178,176],[204,182]], p:{ k:'line', w:18, a:.34, fade:[.6,.95], floor:.2 } },
+      { h:'R', m:'tip', u:[.46,.54], path:zig([138,100],[148,150],3,10),  p:{ k:'line', w:12, a:.3, fade:[.6,.95], floor:.2 } },
+      { h:'L', m:'tip', u:[.55,.63], path:HM(zig([138,100],[148,150],3,10)), p:{ k:'line', w:12, a:.3, fade:[.6,.95], floor:.2 } },
+      { h:'B', m:'tip', u:[.67,.79], path:zig([150,214],[204,176],3,12),  p:{ k:'line', w:14, a:.3, fade:[.7,.95], floor:.2 } },
+    ]},
+  };
+  const CAMS = {
+    peel:  (u, lat)=>({ off:[THREE.MathUtils.clamp(.12 + lat * 1.6, -.5, .5), .74, .44], follow:.45 }),
+    front: (u)=>{ const t = clamp01((u - .6) / .1); return { off:[.12 * t, .7 - .06 * t, .42], follow:.15 }; },
+    serum: (u)=>{ const t = ease(clamp01(u / .8)); return { off:[.44 - .44 * t, .52 + .28 * t, .36 + .12 * t], follow:.25 }; },
+    cream: ()=>({ off:[0, .84, .54], follow:.08 }),
+    sun:   (u)=>{ const t = ease(clamp01((u - .8) / .17)); return { off:[-.48 + .48 * t, .72 + .12 * t, .44 + .08 * t], follow:.3 * (1 - t) }; },
+  };
+
+  // the hands themselves: simple rounded forms, an ivory sleeve, warm skin
+  const HAND_SKIN = new THREE.MeshStandardMaterial({ color:0xe6c1a2, roughness:.6 });
+  const SLEEVE_MAT = new THREE.MeshStandardMaterial({ color:0xf1ebe1, roughness:.92 });
+  const C_TIP = new THREE.Vector3(-.004, -.023, .12), C_PALM = new THREE.Vector3(0, -.0145, .04);
+  const BR_A = new THREE.Vector3(0, -.55, .83).normalize(), BR_G = new THREE.Vector3(0, -.016, .088);
+  const C_BRUSH = BR_G.clone().addScaledVector(BR_A, .142), C_PAD = C_TIP.clone().add(new THREE.Vector3(0, -.0068, 0));
+  const CONTACT = { tip:C_TIP, palm:C_PALM, brush:C_BRUSH, pad:C_PAD };
+  const PITCH = { tip:.32, palm:.06, brush:.14, pad:.22 };
+  const HS = .8;                                   // hand size against the guest's big round head
+  function makeHand(thumb){
+    const g = new THREE.Group();
+    const palm = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), HAND_SKIN); palm.scale.set(.036, .0145, .045); palm.position.set(0, 0, .04); g.add(palm);
+    const wrist = new THREE.Mesh(new THREE.SphereGeometry(.021, 14, 10), HAND_SKIN); wrist.scale.set(1, .75, 1); g.add(wrist);
+    const fgeo = new THREE.CylinderGeometry(.0072, .0078, 1, 10); fgeo.rotateX(Math.PI / 2); fgeo.translate(0, 0, .5);
+    const tgeo = new THREE.SphereGeometry(.0074, 10, 8);
+    [[-.021, .041], [-.007, .05], [.007, .048], [.021, .039]].forEach(([x, len])=>{
+      const f = new THREE.Group(); f.position.set(x, -.002, .072); f.rotation.x = .28;          // fingers curl softly toward the skin
+      const c = new THREE.Mesh(fgeo, HAND_SKIN); c.scale.z = len; f.add(c);
+      const t = new THREE.Mesh(tgeo, HAND_SKIN); t.position.z = len; f.add(t); g.add(f); });
+    const th = new THREE.Group(); th.position.set(thumb * .033, -.004, .028); th.rotation.set(.25, thumb * .55, 0);
+    const tc = new THREE.Mesh(fgeo, HAND_SKIN); tc.scale.set(1.15, 1.15, .036); th.add(tc);
+    const tt = new THREE.Mesh(tgeo, HAND_SKIN); tt.scale.setScalar(1.1); tt.position.z = .036; th.add(tt); g.add(th);
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(.019, .021, .12, 14), HAND_SKIN); arm.rotation.x = Math.PI / 2; arm.position.z = -.055; g.add(arm);
+    const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(.027, .03, .3, 16), SLEEVE_MAT); sleeve.rotation.x = Math.PI / 2; sleeve.position.z = -.24; g.add(sleeve);
+    // cotton pad under the fingertips (peel wipe)
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, .005, 22), new THREE.MeshStandardMaterial({ color:0xfbf8f2, roughness:1 }));
+    pad.position.copy(C_TIP).add(new THREE.Vector3(0, -.004, 0)); pad.visible = false; g.add(pad);
+    // a little formula carried on the fingertip before it is dotted on
+    const bead = new THREE.Mesh(new THREE.SphereGeometry(.0068, 14, 10), new THREE.MeshPhysicalMaterial({ color:0xffffff, roughness:.12, clearcoat:1, transparent:true, opacity:.85 }));
+    bead.position.copy(C_TIP).add(new THREE.Vector3(0, -.003, .002)); bead.scale.set(1, .7, 1); bead.visible = false; g.add(bead);
+    g.traverse(o=>{ if (o.isMesh){ o.castShadow = true; } });
+    g.scale.setScalar(HS); g.visible = false; scene.add(g);
+    return { g, pad, bead, brush:null, k:1 };
+  }
+  // fan brush, held between thumb and fingers of the right hand
+  function makeBrush(){
+    const b = new THREE.Group(), Y = new THREE.Vector3(0, 1, 0), q = new THREE.Quaternion().setFromUnitVectors(Y, BR_A);
+    const part = (geo, mat, along)=>{ const m = new THREE.Mesh(geo, mat); m.quaternion.copy(q); m.position.copy(BR_G).addScaledVector(BR_A, along); m.castShadow = true; b.add(m); };
+    part(new THREE.CylinderGeometry(.0034, .0046, .1, 10), new THREE.MeshStandardMaterial({ color:0x2f3a52, roughness:.35 }), .05);
+    part(new THREE.CylinderGeometry(.0052, .0046, .014, 12), new THREE.MeshStandardMaterial({ color:0xc8b28a, metalness:.7, roughness:.3 }), .107);
+    const bris = new THREE.CylinderGeometry(.013, .005, .028, 16, 1, false); bris.scale(1, 1, .28);
+    part(bris, new THREE.MeshStandardMaterial({ color:0xf7f2ea, roughness:.75 }), .128);
+    b.visible = false; return b;
+  }
+  const HANDS = { R: makeHand(-1), L: makeHand(1) };
+  HANDS.R.brush = makeBrush(); HANDS.R.g.add(HANDS.R.brush);
+
+  const hv = { p:new THREE.Vector3(), n:new THREE.Vector3(), q:new THREE.Vector3(), nq:new THREE.Vector3(), x:new THREE.Vector3(), y:new THREE.Vector3(), z:new THREE.Vector3(),
+    c:new THREE.Vector3(), m:new THREE.Matrix4(), qp:new THREE.Quaternion(), tq:new THREE.Quaternion(), tp:new THREE.Vector3(), ex:new THREE.Vector3(),
+    ctr:new THREE.Vector3(), up:new THREE.Vector3(), fw:new THREE.Vector3(), side:new THREE.Vector3(), contact:new THREE.Vector3(), X:new THREE.Vector3(1, 0, 0) };
+  // a point on the face layer and the outward surface direction there
+  function faceFrame(px, py, P, N){
+    const u = px / FX, v = 1 - py / FX, r = .214;
+    const phi = Math.PI*.2 + u*Math.PI*.6, th = Math.PI*.3 + (1 - v)*Math.PI*.42;
+    const sx = -Math.cos(phi)*Math.sin(th), sy = Math.cos(th), sz = Math.sin(phi)*Math.sin(th);
+    P.set(r*sx, r*sy*.95 + .2, r*sz*.95); meAv.head.localToWorld(P);
+    if (N) N.set(sx, sy, sz).transformDirection(meAv.head.matrixWorld);
+    return P;
+  }
+  const pathAt = (pts, f)=>{ if (pts.length < 2) return pts[0]; const x = f * (pts.length - 1), i = Math.min(pts.length - 2, Math.floor(x)), r = x - i;
+    return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * r, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * r]; };
+  const sstep = (a, b, x)=>{ const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+  // where one hand should be at moment u of the step
+  function handState(ch, side, u){
+    const ms = ch.moves.filter(m=>m.h === side || m.h === 'B'); if (!ms.length) return null;
+    const mir = side === 'L', P = m=>mir ? HM(m.path) : m.path;
+    let prev = null, cur = null, next = null;
+    for (const m of ms){ if (u < m.u[0]){ next = m; break; } if (u <= m.u[1]){ cur = m; break; } prev = m; }
+    // the therapist stands at the head of the bed: fingers point toward the chin, wrists stay out
+    // toward the upper corners so the arms never cross the face
+    const dirOf = (m, px)=>{ const s = px > FX / 2 ? 1 : -1;
+      return m.m === 'palm' ? [s * .28, .96] : m.m === 'brush' ? [-s * .25, .97] : [-s * .42, .9]; };
+    if (cur){
+      const f = clamp01((u - cur.u[0]) / (cur.u[1] - cur.u[0])), fe = ease(f), pts = P(cur), [px, py] = pathAt(pts, fe);
+      let lift;
+      if (cur.taps) lift = .013 * (.5 - .5 * Math.cos(f * cur.taps * Math.PI * 2));
+      else if (cur.press) lift = .016 * (1 - sstep(0, .25, f)) + .016 * sstep(.85, 1, f);
+      else if (pts.length === 1) lift = .016 * (1 - Math.sin(Math.PI * f));
+      else lift = .014 * (1 - sstep(0, .1, f)) + .014 * sstep(.9, 1, f);
+      return { px, py, lift, mode:cur.m, dir:dirOf(cur, px), out:0, cur, next:null, bead: ch.bead && cur.p && cur.p.k === 'dab' && f < .5 };
+    }
+    const lead = .06;
+    if (!prev){       // coming in
+      const [px, py] = P(next)[0];
+      return { px, py, lift:.03, mode:next.m, dir:dirOf(next, px), out: 1 - ease(clamp01((u - (next.u[0] - lead)) / lead)), cur:null, next, bead: ch.bead && next.p && next.p.k === 'dab' };
+    }
+    if (!next){       // done: the hand lifts away and leaves the frame
+      const pts = P(prev), [px, py] = pts[pts.length - 1];
+      return { px, py, lift:.03, mode:prev.m, dir:dirOf(prev, px), out: ease(clamp01((u - prev.u[1]) / lead)), cur:null, next:null, bead:false };
+    }
+    const g = clamp01((u - prev.u[1]) / Math.max(1e-4, next.u[0] - prev.u[1])), a = P(prev)[P(prev).length - 1], b = P(next)[0];
+    const bead = ch.bead && next.p && next.p.k === 'dab';
+    if (prev.m !== next.m){   // changing tools: out of frame and back
+      const first = g < .5, [px, py] = first ? a : b, m = first ? prev : next;
+      return { px, py, lift:.03, mode:m.m, dir:dirOf(m, px), out: Math.sin(Math.PI * g), cur:null, next, bead: bead && !first };
+    }
+    const eg = ease(g);
+    const px = a[0] + (b[0] - a[0]) * eg, py = a[1] + (b[1] - a[1]) * eg;
+    return { px, py, lift: .014 + .045 * Math.sin(Math.PI * g), mode:next.m, dir:dirOf(next, px), out:0, cur:null, next, bead };
+  }
+  function placeHand(H, st, dt, mir){
+    const [dx, dy] = st.dir;
+    faceFrame(st.px, st.py, hv.p, hv.n);
+    faceFrame(st.px + dx * 6, st.py + dy * 6, hv.q);
+    hv.z.subVectors(hv.q, hv.p); hv.z.addScaledVector(hv.n, -hv.z.dot(hv.n)).normalize();
+    hv.y.copy(hv.n); hv.x.crossVectors(hv.y, hv.z).normalize();
+    hv.m.makeBasis(hv.x, hv.y, hv.z); hv.tq.setFromRotationMatrix(hv.m);
+    hv.qp.setFromAxisAngle(hv.X, PITCH[st.mode]); hv.tq.multiply(hv.qp);
+    hv.c.copy(CONTACT[st.mode]).multiplyScalar(HS).applyQuaternion(hv.tq);
+    hv.tp.copy(hv.p).addScaledVector(hv.n, .003 + st.lift).sub(hv.c);
+    if (st.out > 0){   // out of frame: up past the top of the head and away from the face
+      hv.ex.copy(hv.ctr).addScaledVector(hv.up, .42).addScaledVector(hv.fw, .34).addScaledVector(hv.side, (mir ? -1 : 1) * .14);
+      hv.tp.lerp(hv.ex, st.out);
+    }
+    const jump = !H.g.visible;
+    H.g.visible = st.out < .97;
+    const k = jump ? 1 : 1 - Math.exp(-dt * 16);
+    H.g.position.lerp(hv.tp, k); H.g.quaternion.slerp(hv.tq, k);
+    H.pad.visible = st.mode === 'pad'; if (H.brush) H.brush.visible = st.mode === 'brush';
+    H.bead.visible = !!st.bead;
+    return st.out < .5 && (st.cur || st.next);
+  }
+  function hideHand(H, dt){
+    if (!H.g.visible) return;
+    hv.ex.copy(hv.ctr).addScaledVector(hv.up, .42).addScaledVector(hv.fw, .34);
+    H.g.position.lerp(hv.ex, 1 - Math.exp(-dt * 3)); H.bead.visible = false;
+    if (H.g.position.distanceTo(hv.ex) < .06) H.g.visible = false;
+  }
+  function hideHands(dt){ if (!HANDS.R.g.visible && !HANDS.L.g.visible) return; headAxes(); hideHand(HANDS.R, dt); hideHand(HANDS.L, dt); }
+  function headAxes(){
+    hv.ctr.set(0, .2, 0); meAv.head.localToWorld(hv.ctr);
+    hv.up.set(0, 1, 0).transformDirection(meAv.head.matrixWorld);
+    hv.fw.set(0, 0, 1).transformDirection(meAv.head.matrixWorld);
+    hv.side.set(1, 0, 0).transformDirection(meAv.head.matrixWorld);
+  }
+
+  // the formula on the skin, drawn from the moves made so far (so pausing and skipping stay exact)
+  const carry = document.createElement('canvas'); carry.width = carry.height = FX; const carryCtx = carry.getContext('2d'); let carryA = 0;
+  function carryStep(){ carryCtx.clearRect(0, 0, FX, FX); carryCtx.drawImage(pCanvas, 0, 0); carryA = 1; }
+  function paintHands(u, ch){
+    const col = ch.col;
+    pCtx.clearRect(0, 0, FX, FX); pCtx.lineCap = pCtx.lineJoin = 'round';
+    if (carryA > .01){ pCtx.globalAlpha = carryA; pCtx.drawImage(carry, 0, 0); pCtx.globalAlpha = 1; }
+    for (const m of ch.moves){
+      if (!m.p || u < m.u[0]) continue;
+      const f = clamp01((u - m.u[0]) / (m.u[1] - m.u[0])), fe = ease(f), P = m.p;
+      const fade = P.fade ? clamp01((u - P.fade[0]) / (P.fade[1] - P.fade[0])) : 0;
+      const a = P.a * (1 - (1 - (P.floor || 0)) * fade), w = P.w * (1 + ((P.grow || 1) - 1) * fade);
+      for (const side of m.h === 'B' ? ['R', 'L'] : [m.h]){
+        const pts = side === 'L' ? HM(m.path) : m.path;
+        if (P.k === 'wipe'){
+          pCtx.save(); pCtx.globalCompositeOperation = 'destination-out'; pCtx.strokeStyle = 'rgba(0,0,0,.92)'; pCtx.lineWidth = w;
+          if (pts.length > 1) polyline(pCtx, pts, fe, 0); pCtx.restore();
+        } else if (P.k === 'dab'){
+          if (a < .01) continue;
+          const [x, y] = pts[0], r = w / 2 * clamp01(f * 2.2) * (1 - .45 * fade);
+          if (r < .5) continue;
+          const g = pCtx.createRadialGradient(x, y, 0, x, y, r);
+          g.addColorStop(0, rgba(col, a)); g.addColorStop(.7, rgba(col, a * .9)); g.addColorStop(1, rgba(col, 0));
+          pCtx.fillStyle = g; pCtx.beginPath(); pCtx.arc(x, y, r, 0, Math.PI*2); pCtx.fill();
+          pCtx.fillStyle = `rgba(255,255,255,${.85 * a})`; pCtx.beginPath(); pCtx.ellipse(x - r * .3, y - r * .32, r * .28, r * .17, -.6, 0, Math.PI*2); pCtx.fill();
+        } else if (pts.length > 1 && a > .005){
+          pCtx.strokeStyle = rgba(col, a); pCtx.lineWidth = w; polyline(pCtx, pts, fe, 0);
+          if (fade < .9){ pCtx.strokeStyle = `rgba(255,255,255,${.35 * a * (1 - fade)})`; pCtx.lineWidth = Math.max(1.2, w * .14); polyline(pCtx, pts, fe, -w * .22); }
+        }
+      }
+    }
+  }
+  function stepSeconds(){ const g = session.lines[session.i].group; return session.lines.filter(l=>l.group === g).reduce((a, l)=>a + l.dur, 0); }
+  // one step with hands: paint, place both hands, steer the camera
+  function handsStep(dt, s){
+    const ch = fx.hands, u = s / Math.max(6, fx.T - .6);
+    carryA = Math.max(0, carryA - dt * .3);
+    if ((fxFrame++ % (isMobile ? 2 : 1)) === 0){ paintHands(u, ch); compose(); }
+    headAxes();
+    let lead = null;
+    for (const side of ['R', 'L']){
+      const H = HANDS[side], st = handState(ch, side, u);
+      if (!st){ hideHand(H, dt); continue; }
+      H.bead.material.color.set(ch.col); H.bead.scale.setScalar(ch.big ? 1.35 : 1); H.bead.scale.y *= .7;
+      const touching = placeHand(H, st, dt, side === 'L');
+      if (touching && !lead){ lead = side; faceFrame(st.px, st.py, hv.contact); }
+    }
+    if (!lead) faceFrame(FX / 2, FX * .47, hv.contact);
+    // camera: each step has its own angle; it drifts gently with the hands unless the guest has moved it
+    if (!session.userMoved){
+      glide = null;
+      faceFrame(FX / 2, FX * .47, hv.q);
+      hv.camLat = (hv.camLat || 0) + ((hv.contact.x - hv.q.x) - (hv.camLat || 0)) * Math.min(1, dt * 1.2);
+      const c = CAMS[ch.cam](u, hv.camLat);
+      const tgt = hv.tp.copy(hv.q).addScaledVector(hv.c.subVectors(hv.contact, hv.q), c.follow);
+      const pos = hv.ex.set(c.off[0], c.off[1], c.off[2]).add(tgt);
+      const k = window.__snapCam ? 1 : 1 - Math.exp(-dt * .9);
+      camera.position.lerp(pos, k); controls.target.lerp(tgt, k);
+    }
+  }
+
   function faceEffect(dt){
     const av = meAv, e = session && !session.finale ? session.effect : null;
     if (!e || av.lie < .9){
-      hideTools(dt);
+      hideTools(dt); hideHands(dt);
       if (sessionOwnsFace()){ av.pack.visible = false; if (!session.finale && !me.glow) av.sparks.forEach(sp=>sp.material.opacity = 0); }
       return;
     }
     if (fx.key !== e){
+      if (fx.hands) carryStep();                          // what is already on the skin keeps fading, never vanishes
       fx = planStep(e, Math.max(0, session.lines[session.i].group - 1));
+      fx.hands = CHOREO[e.type] || null; fx.T = stepSeconds();
       const p = CATALOG[session.lines[session.i].product] || {};
-      showProduct(fx.L.thick ? (p.thumb || p.image) : p.image);
+      showProduct(fx.hands ? null : fx.L.thick ? (p.thumb || p.image) : p.image);   // with hands, the product stays in the caption
     }
     const L = fx.L;
-    session.effectT += dt;
+    if (!session.paused) session.effectT += dt;
     const s = session.effectT, done = s > L.dur + .8;
     const col = L.col || e.color; eCol.set(col);
     av.pack.material = effMat; av.pack.visible = true;
     effMat.roughness = L.rough; effMat.clearcoat = L.coat;
+    if (fx.hands){
+      effMat.roughness = .22; effMat.clearcoat = .6;
+      hideTools(dt); av.sparks.forEach(sp=>sp.material.opacity = 0);
+      handsStep(session.paused ? 0 : dt, s);
+      return;
+    }
+    hideHands(dt);
     if ((fxFrame++ % (done && !L.absorb ? 8 : isMobile ? 2 : 1)) === 0){ paint(s, col); compose(); }
 
     // where the tools are
