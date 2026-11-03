@@ -1308,7 +1308,8 @@ window.FLEXKIN_SESSION = {
     session.i++; session.t = 0;
     if (session.i >= session.lines.length){ showFinale(); return; }
     const l = session.lines[session.i];
-    if (l.stepStart){ session.effect = l.effect; session.effectT = 0; chime(); highlightProducts({ [l.product]:1 }); }
+    if (l.stepStart){ session.effect = l.effect; session.effectT = 0; chime(); highlightProducts({ [l.product]:1 });
+      if (!session.userMoved) glideTo(FACE_VIEWS[(l.group - 1) % FACE_VIEWS.length]); }
     if (l.group === 0) highlightProducts(null);
     if (l.group === session.c.steps.length + 1){ session.effect = null; highlightProducts(null);
       if (!me.glow){ me.glow = true; pushPresence(); }      // '관리 완료': she smiles and her skin starts to glow
@@ -1377,7 +1378,7 @@ window.FLEXKIN_SESSION = {
   const PLAY_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.6v10.8c0 .5.5.8.9.5l8.4-5.4c.4-.2.4-.8 0-1L4.9 2.1c-.4-.3-.9 0-.9.5z" fill="currentColor"/></svg>';
   function setPauseIcon(paused){ const b = gid('pPause'); b.innerHTML = paused ? PLAY_SVG : PAUSE_SVG; b.setAttribute('aria-label', paused ? '다시 재생' : '잠시 멈춤'); }
   gid('pPause').addEventListener('click', ()=>{ if (!session) return; session.paused = !session.paused; setPauseIcon(session.paused); });
-  gid('pNext').addEventListener('click', ()=>{ if (!session) return;
+  gid('pNext').addEventListener('click', ()=>{ if (!session || session.ended || session.finale || !session.lines[session.i]) return;   // nothing to skip once the care is over
     const g = session.lines[session.i].group; let j = session.i; while (j < session.lines.length && session.lines[j].group === g) j++;
     session.i = j - 1; advance(); });
   gid('pEnd').addEventListener('click', endSession);
@@ -1513,10 +1514,11 @@ window.FLEXKIN_SESSION = {
   const ENTRY_VIEW = { get pos(){ return entryView().pos; }, get target(){ return entryView().target; } };
   const HOME_VIEW = { get pos(){ return (me.bed >= 0 ? BED_VIEW : ENTRY_VIEW).pos; }, get target(){ return (me.bed >= 0 ? BED_VIEW : ENTRY_VIEW).target; } };
   const FACE_VIEW = { pos: new THREE.Vector3(.42, 1.8, BED_Z + .03), target: new THREE.Vector3(0, .98, BED_Z - .5) };   // about 1 m from the face
+  const FACE_VIEWS = [[.42,.82,.53], [-.42,.82,.53], [.25,.85,.5], [.52,.6,.64]].map(([x, y, z])=>({ pos: FACE_VIEW.target.clone().add(new THREE.Vector3(x, y, z)), target: FACE_VIEW.target.clone() }));
   const DISPLAY_VIEW = { pos: new THREE.Vector3(-.15, 1.55, BED_Z + .65), target: new THREE.Vector3(-1.25, .95, -2.2) };
   let glide = null;
   function glideTo(v){ glide = reduce ? null : { pos:v.pos.clone(), target:v.target.clone(), life:0 }; if (reduce){ camera.position.copy(v.pos); controls.target.copy(v.target); } }
-  controls.addEventListener('start', ()=>{ glide = null; });
+  controls.addEventListener('start', ()=>{ glide = null; if (session) session.userMoved = true; });
 
   /* ---------- lights soften during the session ---------- */
   const faceLight = new THREE.PointLight(0xffd8b0, 0, 1.8, 2); faceLight.position.set(.95, 1.25, BED_Z - .2); scene.add(faceLight);
@@ -1524,57 +1526,134 @@ window.FLEXKIN_SESSION = {
   let calm = 0;
 
   /* ---------- what happens on the customer's face, per product ----------
-     The product is painted onto a face-shaped layer stroke by stroke, following
-     the order a therapist would use (forehead → cheeks → nose → chin), with a soft
-     light marking where it is being applied. Eyes and lips are always left clear. */
-  const FX = 256;                                            // face layer texture size
+     Each step shows the product doing the work: a dropper or vial tips drops onto the skin,
+     a spatula spreads cream or paste beside its jar or bowl, or a sheet mask is laid on.
+     The formula is painted onto a face-shaped layer — drops with highlights that spread,
+     ridged cream strokes that sink in, thick paste with spatula marks — and the route and
+     camera angle change from step to step. Eyes and lips always stay clear. */
+  const FX = 256;
   const fxCanvas = document.createElement('canvas'); fxCanvas.width = fxCanvas.height = FX;
   const fxCtx = fxCanvas.getContext('2d');
-  const covCanvas = document.createElement('canvas'); covCanvas.width = covCanvas.height = FX;   // where product has landed so far
-  const covCtx = covCanvas.getContext('2d');
+  const pCanvas = document.createElement('canvas'); pCanvas.width = pCanvas.height = FX;      // the formula as painted so far
+  const pCtx = pCanvas.getContext('2d');
   const fxTex = new THREE.CanvasTexture(fxCanvas); fxTex.encoding = THREE.sRGBEncoding;
   const effMat = new THREE.MeshPhysicalMaterial({ map:fxTex, color:0xffffff, roughness:.15, clearcoat:1, clearcoatRoughness:.05,
     transparent:true, opacity:1, depthWrite:false, envMapIntensity:1.5, polygonOffset:true, polygonOffsetFactor:-2 });
-  // face layout on the layer (canvas px): eyes and lips measured from the head model
   const EYE_L = [.312*FX, .51*FX], EYE_R = [.688*FX, .51*FX], LIPS = [.5*FX, .73*FX];
-  // application path: forehead sweep, right cheek circles, nose, left cheek circles, chin
-  const PATH = (()=>{ const p = [];
-    for (let i=0;i<=10;i++) p.push([.2 + i*.06, .14 + Math.sin(i*.9)*.03]);
-    for (let i=0;i<=12;i++){ const a = i/12*Math.PI*2.2; p.push([.76 + Math.cos(a)*.07, .62 + Math.sin(a)*.08]); }
-    for (let i=0;i<=5;i++) p.push([.5, .3 + i*.06]);
-    for (let i=0;i<=12;i++){ const a = Math.PI - i/12*Math.PI*2.2; p.push([.24 + Math.cos(a)*.07, .62 + Math.sin(a)*.08]); }
-    for (let i=0;i<=8;i++) p.push([.36 + i*.035, .86 + Math.sin(i)*.015]);
-    return p.map(([u, v])=>[u*FX, v*FX]); })();
-  const LOOK = {   // color, peak opacity, final opacity, stroke size, how long the application takes (s), surface
-    shimmer:  { col:'#f4fbff', a:.6,  end:.42, r:22, dur:6,  rough:.08, coat:1,  sparkle:true },
-    droplets: { col:null,      a:.62, end:.5,  r:18, dur:7,  rough:.06, coat:1,  drops:true },
-    gloss:    { col:null,      a:.66, end:.55, r:24, dur:6,  rough:.05, coat:1 },
-    cream:    { col:'#fffaf1', a:.94, end:.32, r:26, dur:7,  rough:.5,  coat:.3, absorb:true },
-    veil:     { col:'#fff6e8', a:.70, end:.36, r:26, dur:6,  rough:.3,  coat:.5, absorb:true },
-    modeling: { col:null,      a:.97, end:.97, r:30, dur:8,  rough:.55, coat:.25, thick:true },
-    sheet:    { col:'#fbf8f2', a:.96, end:.96, r:0,  dur:5,  rough:.7,  coat:.2, sheet:true },
+  const ZONE = { forehead:[.5,.17], rCheek:[.74,.63], lCheek:[.26,.63], nose:[.5,.43], chin:[.5,.88] };
+  const ORDERS = [['forehead','rCheek','nose','lCheek','chin'], ['lCheek','rCheek','forehead','chin','nose'], ['nose','forehead','rCheek','lCheek','chin'], ['chin','lCheek','forehead','rCheek','nose']];
+  const LOOK = {   // tool, colour, opacity, how long the application takes (s), surface
+    shimmer:  { tool:'drop',    col:'#eef8ff', a:.55, film:.34, dur:9,  rough:.08, coat:1,   sparkle:true },
+    droplets: { tool:'drop',    col:null,      a:.62, film:.42, dur:10, rough:.06, coat:1 },
+    gloss:    { tool:'drop',    col:null,      a:.64, film:.5,  dur:9,  rough:.05, coat:1,   glints:true },
+    cream:    { tool:'spatula', col:'#fffaf2', a:.95, end:.3,  w:19, dur:12, rough:.45, coat:.35, absorb:true, dots:true },
+    veil:     { tool:'spatula', col:'#fff6ea', a:.88, end:.32, w:15, dur:11, rough:.3,  coat:.5,  absorb:true, lines:true },
+    modeling: { tool:'spatula', col:null,      a:.97, end:.97, w:30, dur:13, rough:.6,  coat:.2,  thick:true },
+    sheet:    { tool:'sheet',   col:'#fbf8f2', a:.96, end:.96, dur:6,  rough:.65, coat:.25 },
   };
   const noiseImg = (()=>{ const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), d = x.createImageData(64, 64);
     for (let i=0;i<d.data.length;i+=4){ const n = 200 + Math.random()*55; d.data[i]=d.data[i+1]=d.data[i+2]=n; d.data[i+3]=40; } x.putImageData(d, 0, 0); return c; })();
-  // soft oval so the layer never shows a hard border at the edge of the face
   const faceMask = (()=>{ const c = document.createElement('canvas'); c.width = c.height = FX; const x = c.getContext('2d');
     x.translate(FX/2, FX*.5); x.scale(1, 1.08);
     const g = x.createRadialGradient(0, 0, FX*.3, 0, 0, FX*.47); g.addColorStop(0, '#fff'); g.addColorStop(1, 'rgba(255,255,255,0)');
     x.fillStyle = g; x.beginPath(); x.arc(0, 0, FX*.47, 0, Math.PI*2); x.fill(); return c; })();
-  let fxKey = null, fxDabs = 0, fxFrame = 0;
-  const brush = new THREE.Sprite(new THREE.SpriteMaterial({ map:haloTex, color:0xfff3dc, transparent:true, depthWrite:false, opacity:0, blending:THREE.AdditiveBlending }));
-  scene.add(brush);
-  const uvTmp = new THREE.Vector3(), fTmp = new THREE.Vector3(), eCol = new THREE.Color();
-  // canvas point on the face layer -> world position on the customer's face
-  function facePoint(px, py, out){
-    const u = px / FX, v = 1 - py / FX, r = .214;
-    const phi = Math.PI*.2 + u*Math.PI*.6, th = Math.PI*.3 + (1 - v)*Math.PI*.42;
-    out.set(-r*Math.cos(phi)*Math.sin(th), r*Math.cos(th)*.95 + .2, r*Math.sin(phi)*Math.sin(th)*.95);
-    return meAv.head.localToWorld(out);
+  const clamp01 = v => Math.max(0, Math.min(1, v));
+  const shade = (hex, k) => { const c = new THREE.Color(hex); c.multiplyScalar(k); return `rgb(${Math.round(c.r*255)},${Math.round(c.g*255)},${Math.round(c.b*255)})`; };
+  const rgba = (hex, a) => { const c = new THREE.Color(hex); return `rgba(${Math.round(c.r*255)},${Math.round(c.g*255)},${Math.round(c.b*255)},${a})`; };
+
+  // the plan for one step: where drops land, where the spatula goes, in which order
+  let fx = { key:null };
+  function planStep(e, stepIdx){
+    const L = LOOK[e.type] || LOOK.gloss, order = ORDERS[stepIdx % ORDERS.length];
+    const zones = order.map(z=>ZONE[z].map(v=>v*FX));
+    const plan = { key:e, L, zones, drops:[], dots:[], strokes:[], stepIdx };
+    if (L.tool === 'drop'){
+      // two or three drops per zone, spread through the first three quarters of the application
+      const per = 3, total = zones.length * per, span = L.dur * .75;
+      zones.forEach(([x, y], zi)=>{ for (let k=0;k<per;k++){ const i = zi*per + k;
+        plan.drops.push({ x: x + (k - 1) * 13 + (Math.random() - .5) * 6, y: y + (k % 2 ? 8 : -6) + (Math.random() - .5) * 6, at: .8 + i / total * span, s: .85 + Math.random() * .4 }); } });
+    } else if (L.tool === 'spatula'){
+      const t0 = L.dots || L.lines ? 2.6 : .4, span = L.dur - t0 - .4;
+      if (L.dots) zones.forEach(([x, y], i)=>plan.dots.push({ x, y, at: .3 + i * .45 }));                 // a dollop on each zone first
+      if (L.lines) zones.forEach(([x, y], i)=>plan.dots.push({ x, y, at: .3 + i * .45, line:true }));    // sun cream: short lines
+      if (L.thick){
+        // modeling paste: long sweeps across the face, top to bottom, alternating direction
+        const rows = 10;
+        for (let r=0;r<rows;r++){ const y = (.12 + r * .085) * FX, dir = r % 2 ? -1 : 1, pts = [];
+          for (let k=0;k<=8;k++){ const u = .14 + k / 8 * .72; pts.push([(dir > 0 ? u : 1 - u) * FX, y + Math.sin(k * .9 + r) * 3]); }
+          plan.strokes.push({ pts, t0: t0 + r / rows * span, t1: t0 + (r + 1) / rows * span }); }
+      } else {
+        // cream: from each dollop, three strokes outward (the way it is spread by hand)
+        const per = 3, n = zones.length * per;
+        zones.forEach(([x, y], zi)=>{ for (let k=0;k<per;k++){ const i = zi*per + k;
+          const away = Math.atan2(y - FX*.5, x - FX*.5) + (k - 1) * .7 + (zi % 2 ? .3 : -.3), len = 26 + k * 6, pts = [];
+          for (let m=0;m<=6;m++){ const f = m / 6; pts.push([x + Math.cos(away) * len * f + Math.sin(f * 3 + i) * 2, y + Math.sin(away) * len * f]); }
+          plan.strokes.push({ pts, t0: t0 + i / n * span, t1: t0 + (i + 1) / n * span }); } });
+      }
+    }
+    return plan;
   }
-  function dab(x, y, r, a){
-    const g = covCtx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(255,255,255,${a})`); g.addColorStop(1, 'rgba(255,255,255,0)');
-    covCtx.fillStyle = g; covCtx.beginPath(); covCtx.arc(x, y, r, 0, Math.PI*2); covCtx.fill();
+
+  function polyline(ctx, pts, frac, off){
+    const n = Math.max(1, Math.floor((pts.length - 1) * frac)), rem = (pts.length - 1) * frac - n + 1;
+    ctx.beginPath();
+    for (let i=0;i<=n && i<pts.length;i++){
+      let [x, y] = pts[i];
+      if (i === n && i > 0 && rem < 1){ const [px, py] = pts[i - 1]; x = px + (x - px) * rem; y = py + (y - py) * rem; }
+      if (off){ const j = Math.min(pts.length - 1, Math.max(1, i)), [ax, ay] = pts[j - 1], [bx, by] = pts[j], l = Math.hypot(bx - ax, by - ay) || 1; x += -(by - ay) / l * off; y += (bx - ax) / l * off; }
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.stroke();
+  }
+  function paint(now, col){
+    const L = fx.L;
+    pCtx.clearRect(0, 0, FX, FX); pCtx.globalAlpha = 1; pCtx.lineCap = pCtx.lineJoin = 'round';
+    if (L.tool === 'drop'){
+      // once the drops are in, they join into a thin even film
+      const film = clamp01((now - L.dur * .8) / 4);
+      if (film > 0){ pCtx.fillStyle = rgba(col, L.film * film); pCtx.fillRect(0, 0, FX, FX); }
+      for (const d of fx.drops){
+        const age = now - d.at; if (age < 0) continue;
+        const r = (5 + Math.min(age, 3.5) * 6) * d.s, wet = Math.max(.3, 1 - age * .17);
+        const g = pCtx.createRadialGradient(d.x, d.y, 0, d.x, d.y, r);
+        g.addColorStop(0, rgba(col, L.a)); g.addColorStop(.75, rgba(col, L.a * .8)); g.addColorStop(1, rgba(col, 0));
+        pCtx.fillStyle = g; pCtx.beginPath(); pCtx.arc(d.x, d.y, r, 0, Math.PI*2); pCtx.fill();
+        if (age < 1.6){ pCtx.strokeStyle = `rgba(60,40,30,${.16 * (1 - age / 1.6)})`; pCtx.lineWidth = 1.4; pCtx.beginPath(); pCtx.arc(d.x, d.y, r * .82, 0, Math.PI*2); pCtx.stroke(); }
+        pCtx.fillStyle = `rgba(255,255,255,${.9 * wet})`; pCtx.beginPath(); pCtx.ellipse(d.x - r * .3, d.y - r * .32, Math.max(1.5, r * .26), Math.max(1, r * .15), -.6, 0, Math.PI*2); pCtx.fill();
+      }
+    } else if (L.tool === 'spatula'){
+      const absorb = L.absorb ? clamp01((now - L.dur) / 9) : 0;
+      if (L.thick && now > L.dur){ pCtx.fillStyle = rgba(col, L.a); pCtx.fillRect(0, 0, FX, FX); }          // fully covered
+      if (absorb > 0){ pCtx.fillStyle = rgba(col, L.end * absorb); pCtx.fillRect(0, 0, FX, FX); }             // what stays after it sinks in
+      const fade = 1 - absorb;
+      for (const d of fx.dots){
+        const age = now - d.at; if (age < 0) continue;
+        const used = fx.strokes.filter(st=>Math.hypot(st.pts[0][0] - d.x, st.pts[0][1] - d.y) < 4 && now > st.t0).length;
+        const left = 1 - used / 3; if (left <= 0) continue;
+        if (d.line){ pCtx.strokeStyle = rgba(col, .95 * fade); pCtx.lineWidth = 6 * left; polyline(pCtx, [[d.x - 14, d.y - 3], [d.x + 14, d.y + 3]], Math.min(1, age * 3)); }
+        else { const r = 8 * Math.min(1, age * 4) * (.4 + .6 * left);
+          pCtx.fillStyle = rgba(col, .97 * fade); pCtx.beginPath(); pCtx.arc(d.x, d.y, r, 0, Math.PI*2); pCtx.fill();
+          pCtx.fillStyle = `rgba(255,255,255,${.9 * fade})`; pCtx.beginPath(); pCtx.arc(d.x - r * .3, d.y - r * .35, r * .3, 0, Math.PI*2); pCtx.fill(); }
+      }
+      for (const st of fx.strokes){
+        const f = clamp01((now - st.t0) / (st.t1 - st.t0)); if (f <= 0) continue;
+        pCtx.strokeStyle = rgba(col, L.a * fade); pCtx.lineWidth = L.w; polyline(pCtx, st.pts, f, 0);
+        // ridges left by the spatula: a bright edge and a soft shadow along each stroke
+        const ridge = L.thick ? .55 : .5 * fade;
+        if (ridge > .02){
+          pCtx.lineWidth = 1.6;
+          pCtx.strokeStyle = `rgba(255,255,255,${ridge})`; polyline(pCtx, st.pts, f, -L.w * .3); polyline(pCtx, st.pts, f, L.w * .05);
+          pCtx.strokeStyle = rgba(shade(col, .78), ridge * .6); polyline(pCtx, st.pts, f, L.w * .32); polyline(pCtx, st.pts, f, -L.w * .12);
+        }
+      }
+    } else {
+      // sheet mask: unrolls from the forehead; fibres and a gel sheen
+      const edge = clamp01(now / L.dur) * FX * 1.05;
+      pCtx.fillStyle = rgba(col, L.a); pCtx.fillRect(0, 0, FX, Math.min(FX, edge));
+      pCtx.globalAlpha = .55; pCtx.fillStyle = pCtx.createPattern(noiseImg, 'repeat'); pCtx.fillRect(0, 0, FX, Math.min(FX, edge)); pCtx.globalAlpha = 1;
+      const g = pCtx.createLinearGradient(0, edge - 30, 0, edge); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(255,255,255,.7)');
+      pCtx.fillStyle = g; pCtx.fillRect(0, Math.max(0, edge - 30), FX, 30);
+    }
   }
   function clearFeatures(ctx, scale=1){
     ctx.save(); ctx.globalCompositeOperation = 'destination-out'; ctx.fillStyle = '#000';
@@ -1582,101 +1661,149 @@ window.FLEXKIN_SESSION = {
     ctx.beginPath(); ctx.ellipse(LIPS[0], LIPS[1], 22*scale, 11*scale, 0, 0, Math.PI*2); ctx.fill();
     ctx.restore();
   }
-  function paintLayer(L, col, alpha){
-    fxCtx.clearRect(0, 0, FX, FX);
+  function compose(){
+    const L = fx.L;
+    fxCtx.clearRect(0, 0, FX, FX); fxCtx.globalCompositeOperation = 'source-over';
+    fxCtx.drawImage(pCanvas, 0, 0);
+    fxCtx.globalCompositeOperation = 'destination-in'; fxCtx.drawImage(faceMask, 0, 0);
     fxCtx.globalCompositeOperation = 'source-over';
-    fxCtx.fillStyle = col; fxCtx.globalAlpha = 1; fxCtx.fillRect(0, 0, FX, FX);
-    if (L.thick || L.sheet || L.absorb){ fxCtx.globalAlpha = L.sheet ? .5 : .35; fxCtx.fillStyle = fxCtx.createPattern(noiseImg, 'repeat'); fxCtx.fillRect(0, 0, FX, FX); fxCtx.globalAlpha = 1; }
-    fxCtx.globalCompositeOperation = 'destination-in';
-    fxCtx.globalAlpha = alpha; fxCtx.drawImage(covCanvas, 0, 0); fxCtx.globalAlpha = 1;
-    fxCtx.drawImage(faceMask, 0, 0);
-    fxCtx.globalCompositeOperation = 'source-over';
-    if (L.thick){                                            // depth: slightly deeper tone toward the paste's edge and around the openings
+    if (L.thick){
       fxCtx.globalCompositeOperation = 'source-atop';
       const g = fxCtx.createRadialGradient(FX/2, FX*.5, FX*.18, FX/2, FX*.5, FX*.5);
-      g.addColorStop(0, 'rgba(255,255,255,.18)'); g.addColorStop(.7, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(90,50,40,.28)');
-      fxCtx.fillStyle = g; fxCtx.fillRect(0, 0, FX, FX);
-      fxCtx.strokeStyle = 'rgba(90,50,40,.25)'; fxCtx.lineWidth = 5;
-      for (const [x, y] of [EYE_L, EYE_R]){ fxCtx.beginPath(); fxCtx.ellipse(x, y, 19, 18, 0, 0, Math.PI*2); fxCtx.stroke(); }
-      fxCtx.beginPath(); fxCtx.ellipse(LIPS[0], LIPS[1], 24, 13, 0, 0, Math.PI*2); fxCtx.stroke();
-      fxCtx.globalCompositeOperation = 'source-over';
+      g.addColorStop(0, 'rgba(255,255,255,.15)'); g.addColorStop(.7, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(90,50,40,.25)');
+      fxCtx.fillStyle = g; fxCtx.fillRect(0, 0, FX, FX); fxCtx.globalCompositeOperation = 'source-over';
     }
-    clearFeatures(fxCtx, L.sheet ? 1.15 : 1);
-    if (L.sheet){                                            // the sheet's soft edge line around the openings
-      fxCtx.strokeStyle = 'rgba(200,190,175,.6)'; fxCtx.lineWidth = 1.5;
-      for (const [x, y] of [EYE_L, EYE_R]){ fxCtx.beginPath(); fxCtx.ellipse(x, y, 19.5, 15, 0, 0, Math.PI*2); fxCtx.stroke(); }
-      fxCtx.beginPath(); fxCtx.ellipse(LIPS[0], LIPS[1], 25, 13, 0, 0, Math.PI*2); fxCtx.stroke();
-    }
+    clearFeatures(fxCtx, L.tool === 'sheet' ? 1.15 : 1);
     fxTex.needsUpdate = true;
+  }
+
+  /* ---------- the applicators: the product photo, a spatula, falling drops ---------- */
+  const spatTex = canvasTex(160, 40, (c, w, h)=>{ c.fillStyle = '#f7f5f0'; c.strokeStyle = 'rgba(120,110,100,.5)'; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(6, 20); c.quadraticCurveTo(6, 6, 30, 7); c.lineTo(70, 12); c.lineTo(154, 15); c.quadraticCurveTo(158, 20, 154, 25); c.lineTo(70, 28); c.lineTo(30, 33); c.quadraticCurveTo(6, 34, 6, 20); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = 'rgba(255,255,255,.9)'; c.fillRect(30, 12, 38, 3); });
+  const dropTex = canvasTex(48, 64, (c, w, h)=>{ c.fillStyle = '#fff'; c.beginPath(); c.moveTo(24, 4); c.bezierCurveTo(34, 24, 44, 34, 44, 44); c.arc(24, 44, 20, 0, Math.PI); c.bezierCurveTo(4, 34, 14, 24, 24, 4); c.fill();
+    c.fillStyle = 'rgba(255,255,255,1)'; c.globalCompositeOperation = 'destination-out'; c.globalAlpha = .45; c.beginPath(); c.arc(24, 46, 15, 0, Math.PI*2); c.fill(); c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1;
+    c.fillStyle = '#fff'; c.beginPath(); c.ellipse(17, 38, 4, 7, -.4, 0, Math.PI*2); c.fill(); });
+  const prodSprite = new THREE.Sprite(new THREE.SpriteMaterial({ transparent:true, opacity:0, depthWrite:false }));
+  const spatSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map:spatTex, transparent:true, opacity:0, depthWrite:false }));
+  const beadSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map:haloTex, transparent:true, opacity:0, depthWrite:false }));
+  const fallSprites = [0,1,2,3].map(()=>new THREE.Sprite(new THREE.SpriteMaterial({ map:dropTex, transparent:true, opacity:0, depthWrite:false })));
+  [prodSprite, spatSprite, beadSprite, ...fallSprites].forEach(sp=>{ sp.renderOrder = 6; scene.add(sp); });
+  spatSprite.scale.set(.13, .033, 1);
+  let prodShown = null;
+  function showProduct(url){
+    if (prodShown === url) return; prodShown = url;
+    prodSprite.material.opacity = 0;
+    if (!url){ prodSprite.material.map = null; return; }
+    productTexture(url).then(t=>{ if (prodShown !== url) return;
+      prodSprite.material.map = t; prodSprite.material.needsUpdate = true;
+      const a = t.image.width / t.image.height, h = .15; prodSprite.scale.set(h * a, h, 1); prodSprite.userData.h = h; }).catch(()=>{});
+  }
+  const brush = beadSprite;                                      // kept for older call sites
+  const uvTmp = new THREE.Vector3(), fTmp = new THREE.Vector3(), eCol = new THREE.Color(), pA = new THREE.Vector3(), pB = new THREE.Vector3(), camR = new THREE.Vector3();
+  function facePoint(px, py, out){
+    const u = px / FX, v = 1 - py / FX, r = .214;
+    const phi = Math.PI*.2 + u*Math.PI*.6, th = Math.PI*.3 + (1 - v)*Math.PI*.42;
+    out.set(-r*Math.cos(phi)*Math.sin(th), r*Math.cos(th)*.95 + .2, r*Math.sin(phi)*Math.sin(th)*.95);
+    return meAv.head.localToWorld(out);
+  }
+  const ease = f => f < .5 ? 2*f*f : 1 - Math.pow(-2*f + 2, 2)/2;
+  function hideTools(dt){
+    const k = Math.max(0, 1 - dt * 3);
+    [prodSprite, spatSprite, beadSprite, ...fallSprites].forEach(sp=>sp.material.opacity *= k);
   }
 
   function faceEffect(dt){
     const av = meAv, e = session && !session.finale ? session.effect : null;
     if (!e || av.lie < .9){
-      if (sessionOwnsFace()){ av.pack.visible = false; brush.material.opacity = 0; if (!session.finale && !me.glow) av.sparks.forEach(sp=>sp.material.opacity = 0); }
+      hideTools(dt);
+      if (sessionOwnsFace()){ av.pack.visible = false; if (!session.finale && !me.glow) av.sparks.forEach(sp=>sp.material.opacity = 0); }
       return;
     }
-    const L = LOOK[e.type] || LOOK.gloss;
-    if (session.effect !== fxKey){ fxKey = session.effect; fxDabs = 0; covCtx.clearRect(0, 0, FX, FX); }
+    if (fx.key !== e){
+      fx = planStep(e, Math.max(0, session.lines[session.i].group - 1));
+      const p = CATALOG[session.lines[session.i].product] || {};
+      showProduct(fx.L.thick ? (p.thumb || p.image) : p.image);
+    }
+    const L = fx.L;
     session.effectT += dt;
-    const s = session.effectT, apply = Math.min(1, s / L.dur);
-    const col = L.col || e.color;
-    eCol.set(col);
+    const s = session.effectT, done = s > L.dur + .8;
+    const col = L.col || e.color; eCol.set(col);
     av.pack.material = effMat; av.pack.visible = true;
     effMat.roughness = L.rough; effMat.clearcoat = L.coat;
+    if ((fxFrame++ % (done && !L.absorb ? 8 : isMobile ? 2 : 1)) === 0){ paint(s, col); compose(); }
 
-    // lay the product down along the path (a sheet mask unrolls from the forehead instead)
-    let bx = null, by = null;
-    if (L.sheet){
-      const edge = apply * FX * 1.05;
-      covCtx.fillStyle = '#fff'; covCtx.fillRect(0, 0, FX, Math.min(FX, edge));
-      if (apply < 1){ bx = FX/2; by = edge; }
-    } else {
-      const want = Math.floor(apply * PATH.length);
-      while (fxDabs < want){
-        const [x, y] = PATH[fxDabs], r = L.r;
-        dab(x, y, r * 1.7, .9);
-        if (L.thick) dab(x + 6, y + 4, r * 1.5, .9);
-        fxDabs++;
-      }
-      if (apply >= 1 && !L.drops){ covCtx.fillStyle = 'rgba(255,255,255,.6)'; covCtx.fillRect(0, 0, FX, FX); }   // smooth out once spread
-      if (apply < 1 && fxDabs > 0){ [bx, by] = PATH[Math.min(fxDabs, PATH.length - 1)]; }
-    }
-    // how much product shows: builds up while applying, absorbs afterwards (creams, sun care)
-    const after = Math.max(0, s - L.dur);
-    const alpha = apply < 1 ? L.a : (L.absorb ? Math.max(L.end, L.a - after * .05) : L.end);
-    if ((fxFrame++ % (apply < 1 || L.absorb ? 1 : 6)) === 0) paintLayer(L, col, alpha);
-
-    // the soft light that shows where the product is going on right now
-    if (bx !== null && !reduce){ facePoint(bx, by, uvTmp); brush.position.copy(uvTmp); brush.material.opacity = .9; brush.scale.setScalar(.09); }
-    else brush.material.opacity = Math.max(0, brush.material.opacity - dt * 2);
-
-    // droplets falling onto the face, sparkles for the peel, glints on fresh serum
+    // where the tools are
     av.face.getWorldPosition(fTmp);
+    camR.setFromMatrixColumn(camera.matrixWorld, 0);
+    const bob = reduce ? 0 : Math.sin(s * 2.2) * .008;
+    let prodTarget = null, prodTilt = -.15, spatAt = null, spatAngle = 0, beadAt = null;
+    if (L.tool === 'drop'){
+      const next = fx.drops.find(d=>d.at > s - .1) || fx.drops[fx.drops.length - 1];
+      facePoint(next.x, next.y, pA);
+      prodTarget = pA.clone().add(new THREE.Vector3(0, .17, 0));
+      prodTilt = next.at - s < .5 && next.at - s > -.1 ? -.75 : -.3;      // tips over as it pours
+    } else if (L.tool === 'spatula'){
+      const dispensing = fx.dots.find(d=>d.at > s - .2 && d.at < s + .45);
+      if (dispensing){ facePoint(dispensing.x, dispensing.y, pA); prodTarget = pA.clone().add(new THREE.Vector3(0, .15, 0)); prodTilt = -.9; }
+      else prodTarget = fTmp.clone().addScaledVector(camR, .3).add(new THREE.Vector3(0, .14 + bob, 0));
+      const st = fx.strokes.find(q=>s >= q.t0 && s <= q.t1) || fx.strokes.find(q=>q.t0 > s);
+      if (st && s < L.dur){
+        const f = clamp01((s - st.t0) / (st.t1 - st.t0)), idx = Math.min(st.pts.length - 2, Math.floor(f * (st.pts.length - 1)));
+        const [ax, ay] = st.pts[idx], [bx, by] = st.pts[idx + 1], g = f * (st.pts.length - 1) - idx;
+        facePoint(ax + (bx - ax) * g, ay + (by - ay) * g, pA); spatAt = pA.clone().add(new THREE.Vector3(0, .02, 0));
+        facePoint(bx, by, pB);
+        const sa = pA.clone().project(camera), sb = pB.clone().project(camera);
+        spatAngle = Math.atan2((sb.y - sa.y), (sb.x - sa.x) * camera.aspect);
+        if (f < .25) beadAt = spatAt;
+      }
+    } else {
+      prodTarget = fTmp.clone().addScaledVector(camR, .3).add(new THREE.Vector3(0, .14 + bob, 0));
+    }
+    const vis = done ? Math.max(0, 1 - (s - L.dur - .8) * 1.5) : Math.min(1, s * 2);
+    if (prodTarget){
+      if (prodSprite.material.opacity < .05) prodSprite.position.copy(prodTarget);
+      prodSprite.position.lerp(prodTarget, Math.min(1, dt * 4));
+      prodSprite.material.rotation += (prodTilt - prodSprite.material.rotation) * Math.min(1, dt * 5);
+      prodSprite.material.opacity = prodSprite.material.map ? vis : 0;
+    }
+    if (spatAt && !reduce){
+      if (spatSprite.material.opacity < .05) spatSprite.position.copy(spatAt);
+      spatSprite.position.lerp(spatAt, Math.min(1, dt * 10));
+      spatSprite.material.rotation = spatAngle + Math.PI;
+      spatSprite.material.opacity = Math.min(1, spatSprite.material.opacity + dt * 4);
+    } else spatSprite.material.opacity = Math.max(0, spatSprite.material.opacity - dt * 3);
+    if (beadAt){ beadSprite.position.copy(beadAt); beadSprite.material.color.copy(eCol); beadSprite.material.opacity = .9; beadSprite.scale.setScalar(.035); }
+    else beadSprite.material.opacity = Math.max(0, beadSprite.material.opacity - dt * 3);
+
+    // falling drops: from the bottle tip down to where they land
+    if (L.tool === 'drop' && !reduce){
+      const falling = fx.drops.filter(d=>s > d.at - .45 && s < d.at).slice(0, fallSprites.length);
+      fallSprites.forEach((sp, i)=>{
+        const d = falling[i]; if (!d){ sp.material.opacity = 0; return; }
+        facePoint(d.x, d.y, pA); const f = clamp01(1 - (d.at - s) / .45);
+        const top = prodSprite.position.clone().add(new THREE.Vector3(0, -(prodSprite.userData.h || .15) * .45, 0));
+        sp.position.lerpVectors(top, pA, f * f);
+        sp.material.color.copy(eCol).lerp(new THREE.Color(0xffffff), .4); sp.material.opacity = .95;
+        sp.scale.set(.018, .024, 1);
+      });
+    } else fallSprites.forEach(sp=>sp.material.opacity = 0);
+
+    // sparkles for the peel, glints on fresh serum
     av.sparks.forEach((sp, i)=>{
-      const n = av.sparks.length;
       if (reduce){ sp.material.opacity = 0; return; }
       sp.material.color.set(0xffffff);
-      if (L.drops){
-        const f = ((s * .5) + i / n) % 1, tgt = PATH[(i * 11 + Math.floor(s * .5 + i / n) * 7) % PATH.length];
-        facePoint(tgt[0], tgt[1], uvTmp);
-        sp.position.set(uvTmp.x, uvTmp.y + (1 - f) * .28, uvTmp.z);
-        sp.material.color.copy(eCol).lerp(new THREE.Color(0xffffff), .35);
-        sp.material.opacity = f < .92 ? .95 : 0; sp.scale.setScalar(.03 + f * .012);
-        if (f > .9) dab(tgt[0], tgt[1], L.r * 1.4, .7);     // each drop spreads where it lands
-      } else if (L.sparkle){
-        const f = ((s * .35) + i / n) % 1, py = (.12 + (i % 3) * .3) * FX, px = (.1 + f * .8) * FX;
-        facePoint(px, py, uvTmp); sp.position.copy(uvTmp); sp.material.opacity = Math.sin(f * Math.PI) * .9 * Math.min(1, apply * 3); sp.scale.setScalar(.05);
-      } else if (e.type === 'gloss' && i < 3){
+      if (L.sparkle){
+        const f = ((s * .35) + i / av.sparks.length) % 1, py = (.12 + (i % 3) * .3) * FX, px = (.1 + f * .8) * FX;
+        facePoint(px, py, uvTmp); sp.position.copy(uvTmp); sp.material.opacity = Math.sin(f * Math.PI) * .85 * clamp01(s / L.dur * 2); sp.scale.setScalar(.05);
+      } else if (L.glints && i < 3){
         const pt = [[.3*FX,.62*FX],[.7*FX,.62*FX],[.5*FX,.38*FX]][i];
         facePoint(pt[0], pt[1], uvTmp); sp.position.copy(uvTmp);
-        sp.material.opacity = apply * (.45 + .45 * Math.sin(s * 1.4 + i * 2)); sp.scale.setScalar(.06);
-      } else if (L.thick && apply >= 1){
-        const f = ((s * .25) + i / n) % 1; facePoint((.2 + i / n * .6) * FX, .5 * FX, uvTmp);
-        sp.position.set(uvTmp.x, uvTmp.y + .03 + f * .2, uvTmp.z); sp.material.opacity = Math.sin(f * Math.PI) * .35; sp.scale.setScalar(.09);
+        sp.material.opacity = clamp01(s / L.dur) * (.45 + .45 * Math.sin(s * 1.4 + i * 2)); sp.scale.setScalar(.06);
       } else sp.material.opacity = 0;
     });
   }
+  let fxFrame = 0;
 
   let progT = 0;
   function sessionTick(dt){
