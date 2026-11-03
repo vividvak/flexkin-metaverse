@@ -1845,8 +1845,9 @@ window.FLEXKIN_SESSION = {
   // the hands are never drawn: only the tools (brush, pad) show; fingertip work shows as the formula alone
   HAND_SKIN.visible = false; SLEEVE_MAT.visible = false;
   const C_TIP = new THREE.Vector3(-.004, -.023, .12), C_PALM = new THREE.Vector3(0, -.0145, .04);
-  const BR_A = new THREE.Vector3(0, -.55, .83).normalize(), BR_G = new THREE.Vector3(0, -.016, .088);
-  const C_BRUSH = BR_G.clone().addScaledVector(BR_A, .142), C_PAD = C_TIP.clone().add(new THREE.Vector3(0, -.0068, 0));
+  const BR_A = new THREE.Vector3(0, -.42, .91).normalize(), BR_G = new THREE.Vector3(0, -.016, .088);
+  const BR_S = 1.5;                                  // the brush reads clearly at phone size
+  const C_BRUSH = BR_G.clone().addScaledVector(BR_A, .152).multiplyScalar(BR_S), C_PAD = C_TIP.clone().add(new THREE.Vector3(0, -.0068, 0));
   const CONTACT = { tip:C_TIP, palm:C_PALM, brush:C_BRUSH, pad:C_PAD };
   const PITCH = { tip:.32, palm:.06, brush:.14, pad:.22 };
   const HS = .8;                                   // hand size against the guest's big round head
@@ -1875,15 +1876,21 @@ window.FLEXKIN_SESSION = {
     g.scale.setScalar(HS); g.visible = false; scene.add(g);
     return { g, pad, bead, brush:null, k:1 };
   }
-  // fan brush, held between thumb and fingers of the right hand
+  // peel brush, as used in the salon: a long flat silver handle and a wide, flat, translucent head
   function makeBrush(){
     const b = new THREE.Group(), Y = new THREE.Vector3(0, 1, 0), q = new THREE.Quaternion().setFromUnitVectors(Y, BR_A);
-    const part = (geo, mat, along)=>{ const m = new THREE.Mesh(geo, mat); m.quaternion.copy(q); m.position.copy(BR_G).addScaledVector(BR_A, along); m.castShadow = true; b.add(m); };
-    part(new THREE.CylinderGeometry(.0034, .0046, .1, 10), new THREE.MeshStandardMaterial({ color:0x2f3a52, roughness:.35 }), .05);
-    part(new THREE.CylinderGeometry(.0052, .0046, .014, 12), new THREE.MeshStandardMaterial({ color:0xc8b28a, metalness:.7, roughness:.3 }), .107);
-    const bris = new THREE.CylinderGeometry(.013, .005, .028, 16, 1, false); bris.scale(1, 1, .28);
-    part(bris, new THREE.MeshStandardMaterial({ color:0xf7f2ea, roughness:.75 }), .128);
-    b.visible = false; return b;
+    const part = (geo, mat, along)=>{ const m = new THREE.Mesh(geo, mat); m.quaternion.copy(q); m.position.copy(BR_G).addScaledVector(BR_A, along); m.castShadow = true; b.add(m); return m; };
+    const silver = new THREE.MeshStandardMaterial({ color:0xf0f1f3, metalness:.55, roughness:.28, envMapIntensity:1.4 });
+    const handle = new THREE.BoxGeometry(1, 1, 1); handle.translate(0, .5, 0);
+    // the handle widens gently toward the head
+    const h1 = part(handle, silver, -.01); h1.scale.set(.0075, .07, .0028);
+    const h2 = part(handle, silver, .058); h2.scale.set(.011, .044, .0028);
+    part(new THREE.BoxGeometry(.024, .014, .0055), silver, .108);                       // ferrule
+    const bristle = new THREE.MeshPhysicalMaterial({ color:0xf7f5f0, roughness:.45, transmission:.25, transparent:true, opacity:.88, clearcoat:.4 });
+    part(new THREE.BoxGeometry(.028, .026, .0042), bristle, .128);                         // flat head
+    const tip = new THREE.CylinderGeometry(.013, .013, .0042, 24, 1, false, -Math.PI/2, Math.PI); tip.rotateX(Math.PI/2);
+    part(tip, bristle, .141);                                                             // rounded edge
+    b.scale.setScalar(BR_S); b.visible = false; return b;
   }
   const HANDS = { R: makeHand(-1), L: makeHand(1) };
   HANDS.R.brush = makeBrush(); HANDS.R.g.add(HANDS.R.brush);
@@ -2071,12 +2078,12 @@ window.FLEXKIN_SESSION = {
       // the product being applied: beside the head, tipping over each spot as it is dotted on
       av.face.getWorldPosition(fTmp); camR.setFromMatrixColumn(camera.matrixWorld, 0);
       const u = s / Math.max(6, fx.T - .6), dot = fx.hands.moves.find(m=>m.p && m.p.k === 'dab' && u > m.u[0] - .03 && u < m.u[1]);
-      let tilt = -.15;
-      if (dot){ const [px, py] = dot.h === 'L' ? HM(dot.path)[0] : dot.path[0]; facePoint(px, py, pA); pA.y += .15; tilt = -.9; }
+      if (dot){ const [px, py] = dot.h === 'L' ? HM(dot.path)[0] : dot.path[0], f = clamp01((u - dot.u[0]) / (dot.u[1] - dot.u[0]));
+        facePoint(px, py, pA); pA.addScaledVector(camR, px > FX / 2 ? .07 : -.07); pA.y += .13 - .03 * Math.sin(Math.PI * f); }   // upright, dips beside the spot
       else pA.copy(fTmp).addScaledVector(camR, .22).add(new THREE.Vector3(0, .16 + (reduce ? 0 : Math.sin(s * 2.2) * .008), 0));   // stays inside a phone frame
       if (prodSprite.material.opacity < .05) prodSprite.position.copy(pA);
       prodSprite.position.lerp(pA, Math.min(1, dt * 4));
-      prodSprite.material.rotation += (tilt - prodSprite.material.rotation) * Math.min(1, dt * 5);
+      prodSprite.material.rotation += (0 - prodSprite.material.rotation) * Math.min(1, dt * 5);
       prodSprite.material.opacity = prodSprite.material.map ? Math.min(1, s * 2) : 0;
       return;
     }
