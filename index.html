@@ -1567,11 +1567,11 @@ window.FLEXKIN_SESSION = {
   const ZONE = { forehead:[.5,.17], rCheek:[.74,.63], lCheek:[.26,.63], nose:[.5,.43], chin:[.5,.88] };
   const ORDERS = [['forehead','rCheek','nose','lCheek','chin'], ['lCheek','rCheek','forehead','chin','nose'], ['nose','forehead','rCheek','lCheek','chin'], ['chin','lCheek','forehead','rCheek','nose']];
   const LOOK = {   // tool, colour, opacity, how long the application takes (s), surface
-    shimmer:  { tool:'drop',    col:'#eef8ff', a:.55, film:.34, dur:9,  rough:.08, coat:1,   sparkle:true },
-    droplets: { tool:'drop',    col:null,      a:.62, film:.42, dur:10, rough:.06, coat:1 },
-    gloss:    { tool:'drop',    col:null,      a:.64, film:.5,  dur:9,  rough:.05, coat:1,   glints:true },
-    cream:    { tool:'spatula', col:'#fffaf2', a:.95, end:.3,  w:19, dur:12, rough:.45, coat:.35, absorb:true, dots:true },
-    veil:     { tool:'spatula', col:'#fff6ea', a:.88, end:.32, w:15, dur:11, rough:.3,  coat:.5,  absorb:true, lines:true },
+    shimmer:  { tool:'drop',    col:'#eef8ff', a:.55, film:.16, dur:9,  rough:.08, coat:1,   sparkle:true },
+    droplets: { tool:'drop',    col:null,      a:.62, film:.18, dur:10, rough:.06, coat:1 },
+    gloss:    { tool:'drop',    col:null,      a:.64, film:.2,  dur:9,  rough:.05, coat:1,   glints:true },
+    cream:    { tool:'spatula', col:'#fffaf2', a:.95, end:.1,  w:19, dur:12, rough:.45, coat:.35, absorb:true, dots:true },
+    veil:     { tool:'spatula', col:'#fff6ea', a:.88, end:.12, w:15, dur:11, rough:.3,  coat:.5,  absorb:true, lines:true },
     modeling: { tool:'spatula', col:null,      a:.97, end:.97, w:30, dur:13, rough:.6,  coat:.2,  thick:true },
     sheet:    { tool:'sheet',   col:'#fbf8f2', a:.96, end:.96, dur:6,  rough:.65, coat:.25 },
   };
@@ -1607,11 +1607,15 @@ window.FLEXKIN_SESSION = {
           for (let k=0;k<=8;k++){ const u = .14 + k / 8 * .72; pts.push([(dir > 0 ? u : 1 - u) * FX, y + Math.sin(k * .9 + r) * 3]); }
           plan.strokes.push({ pts, t0: t0 + r / rows * span, t1: t0 + (r + 1) / rows * span }); }
       } else {
-        // cream: from each dollop, three strokes outward (the way it is spread by hand)
-        const per = 3, n = zones.length * per;
+        // cream and sun cream: from each dollop, small rolling circles that drift outward
+        // (the way fingertips massage a product in), two passes per zone
+        const per = plan.per = 2, n = zones.length * per;
         zones.forEach(([x, y], zi)=>{ for (let k=0;k<per;k++){ const i = zi*per + k;
-          const away = Math.atan2(y - FX*.5, x - FX*.5) + (k - 1) * .7 + (zi % 2 ? .3 : -.3), len = 26 + k * 6, pts = [];
-          for (let m=0;m<=6;m++){ const f = m / 6; pts.push([x + Math.cos(away) * len * f + Math.sin(f * 3 + i) * 2, y + Math.sin(away) * len * f]); }
+          const away = Math.atan2(y - FX*.5, x - FX*.5) + (k ? .9 : -.9), len = 22 + k * 6, turns = 2.6 + k * .4;
+          const spin = (zi + k) % 2 ? 1 : -1, ph = Math.random() * Math.PI * 2, pts = [];
+          for (let m=0;m<=48;m++){ const f = m / 48, th = ph + spin * f * turns * Math.PI * 2, r = 7 + f * 7;
+            // centre drifts outward; the circle is offset so the first point sits on the dollop
+            pts.push([x + Math.cos(away) * len * f + (Math.cos(th) - Math.cos(ph)) * r, y + Math.sin(away) * len * f + (Math.sin(th) - Math.sin(ph)) * r * .9]); }
           plan.strokes.push({ pts, t0: t0 + i / n * span, t1: t0 + (i + 1) / n * span }); } });
       }
     }
@@ -1653,7 +1657,7 @@ window.FLEXKIN_SESSION = {
       for (const d of fx.dots){
         const age = now - d.at; if (age < 0) continue;
         const used = fx.strokes.filter(st=>Math.hypot(st.pts[0][0] - d.x, st.pts[0][1] - d.y) < 4 && now > st.t0).length;
-        const left = 1 - used / 3; if (left <= 0) continue;
+        const left = 1 - used / (fx.per || 3); if (left <= 0) continue;
         if (d.line){ pCtx.strokeStyle = rgba(col, .95 * fade); pCtx.lineWidth = 6 * left; polyline(pCtx, [[d.x - 14, d.y - 3], [d.x + 14, d.y + 3]], Math.min(1, age * 3)); }
         else { const r = 8 * Math.min(1, age * 4) * (.4 + .6 * left);
           pCtx.fillStyle = rgba(col, .97 * fade); pCtx.beginPath(); pCtx.arc(d.x, d.y, r, 0, Math.PI*2); pCtx.fill();
@@ -1661,9 +1665,10 @@ window.FLEXKIN_SESSION = {
       }
       for (const st of fx.strokes){
         const f = clamp01((now - st.t0) / (st.t1 - st.t0)); if (f <= 0) continue;
-        pCtx.strokeStyle = rgba(col, L.a * fade); pCtx.lineWidth = L.w; polyline(pCtx, st.pts, f, 0);
+        const round = !L.thick;
+        pCtx.strokeStyle = rgba(col, (round ? .7 : 1) * L.a * fade); pCtx.lineWidth = round ? L.w * .42 : L.w; polyline(pCtx, st.pts, f, 0);
         // ridges left by the spatula: a bright edge and a soft shadow along each stroke
-        const ridge = L.thick ? .55 : .5 * fade;
+        const ridge = L.thick ? .55 : .22 * fade;
         if (ridge > .02){
           pCtx.lineWidth = 1.6;
           pCtx.strokeStyle = `rgba(255,255,255,${ridge})`; polyline(pCtx, st.pts, f, -L.w * .3); polyline(pCtx, st.pts, f, L.w * .05);
@@ -1680,9 +1685,12 @@ window.FLEXKIN_SESSION = {
     }
   }
   function clearFeatures(ctx, scale=1){
-    ctx.save(); ctx.globalCompositeOperation = 'destination-out'; ctx.fillStyle = '#000';
-    for (const [x, y] of [EYE_L, EYE_R]){ ctx.beginPath(); ctx.ellipse(x, y, 17*scale, 16*scale, 0, 0, Math.PI*2); ctx.fill(); }
-    ctx.beginPath(); ctx.ellipse(LIPS[0], LIPS[1], 22*scale, 11*scale, 0, 0, Math.PI*2); ctx.fill();
+    ctx.save(); ctx.globalCompositeOperation = 'destination-out';
+    const soft = (cx, cy, rx, ry)=>{ ctx.save(); ctx.translate(cx, cy); ctx.scale(1, ry / rx);
+      const g = ctx.createRadialGradient(0, 0, rx * .45, 0, 0, rx); g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, rx, 0, Math.PI*2); ctx.fill(); ctx.restore(); };
+    for (const [x, y] of [EYE_L, EYE_R]) soft(x, y, 22*scale, 20*scale);
+    soft(LIPS[0], LIPS[1], 27*scale, 15*scale);
     ctx.restore();
   }
   function compose(){
