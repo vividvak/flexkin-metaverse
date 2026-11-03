@@ -573,7 +573,7 @@ window.FLEXKIN_SESSION = {
     const panel = (c, w, h, x, y, z, ry=0, rx=0) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w,h), new THREE.MeshBasicMaterial({color:c, side:THREE.DoubleSide})); m.position.set(x,y,z); m.rotation.set(rx,ry,0); env.add(m); };
     panel(0xffd7a8, 6, .2, 0, 4.2, -4.6); panel(0xffd7a8, 6, .2, 0, 4.2, 4.6);
     panel(0xffe6c4, 3, 1.2, 0, 2.5, -4.9); panel(0xf7d6ae, 3.5, 3, -4.9, 2, 0, Math.PI/2);
-    panel(0xfff0dc, 1, 1, 0, 4.4, 0, 0, Math.PI/2); panel(0x6b4a33, 10, 10, 0, -.4, 0, 0, -Math.PI/2);
+    panel(0x6b4a33, 10, 10, 0, -.4, 0, 0, -Math.PI/2);
     const pm = new THREE.PMREMGenerator(renderer);
     scene.environment = pm.fromScene(env, .04).texture; pm.dispose();
   })();
@@ -886,19 +886,22 @@ window.FLEXKIN_SESSION = {
     });
   }
 
-  /* ---------- lighting: two pendants over the bed ---------- */
-  [BED_Z-.45, BED_Z+.45].forEach(pz=>{ const b = {x:0};
-    add(new THREE.CylinderGeometry(.003,.003,.9,6), M.darkWood, b.x, RH-.65, pz, {cast:false});
-    add(new THREE.SphereGeometry(.13, 40, 20, 0, Math.PI*2, 0, Math.PI/2), new THREE.MeshStandardMaterial({color:0xb68a52, metalness:1, roughness:.3, side:THREE.DoubleSide, envMapIntensity:1.2}), b.x, RH-1.1, pz, {cast:false});
-    add(new THREE.CircleGeometry(.11, 24), new THREE.MeshBasicMaterial({color:0xffe2b8}), b.x, RH-1.105, pz, {rx:Math.PI/2, cast:false});
-    const s = new THREE.SpotLight(0xffd3a0, 1.4, 4.2, .75, .7, 1.6);
-    s.position.set(b.x, RH-1.12, pz); s.target.position.set(b.x, 0, pz); scene.add(s, s.target);
-    s.castShadow = true; const sz = isMobile ? 512 : 1024; s.shadow.mapSize.set(sz, sz);
-    s.shadow.bias = -.0006; s.shadow.normalBias = .02; s.shadow.radius = 5;
-  });
-  scene.add(new THREE.HemisphereLight(0xffe2c4, 0x3b2a1e, .3));
+  /* ---------- lighting: indirect only — nothing shines straight down on the guest ---------- */
+  // a low, warm light bounced in from the side: soft modelling and the room's one soft shadow
+  const keyLight = new THREE.DirectionalLight(0xffd9b0, .3);
+  keyLight.position.set(-2.4, 2.1, .4); keyLight.target.position.set(0, .6, -1.4); scene.add(keyLight, keyLight.target);
+  keyLight.castShadow = true; { const sz = isMobile ? 1024 : 2048; keyLight.shadow.mapSize.set(sz, sz); }
+  Object.assign(keyLight.shadow.camera, { left:-2.4, right:2.4, top:2.4, bottom:-2.4, near:.5, far:7 }); keyLight.shadow.camera.updateProjectionMatrix();
+  keyLight.shadow.bias = -.0005; keyLight.shadow.normalBias = .02; keyLight.shadow.radius = 6;
+  scene.add(new THREE.HemisphereLight(0xffe2c4, 0x3b2a1e, .36));
   const coveLights = [];
-  [[-1.8,-1],[1.8,-1],[0,1.8]].forEach(([x,z])=>{ const p = new THREE.PointLight(0xffc98a, .32, 5, 2); p.position.set(x, RH-.35, z); scene.add(p); coveLights.push(p); });
+  // ceiling cove all round, plus hidden uplights washing the logo wall from the floor
+  [[-1.8,-1],[1.8,-1],[0,1.8]].forEach(([x,z])=>{ const p = new THREE.PointLight(0xffc98a, .45, 5.5, 2); p.position.set(x, RH-.35, z); scene.add(p); coveLights.push(p); });
+  [-1.3, 1.3].forEach(x=>{ const p = new THREE.PointLight(0xffc98a, .35, 2.6, 2); p.position.set(x, .25, -RD/2 + .45); scene.add(p); coveLights.push(p); });
+  // the floor-level LED line along the logo wall that those uplights come from
+  add(new THREE.BoxGeometry(RW - 1.0, .012, .012), ledMat(1.8), 0, .095, -RD/2 + .07, {cast:false});
+  const wallGlowMat = new THREE.MeshBasicMaterial({map:washTex, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, color:0xffc98a, opacity:.35});
+  add(new THREE.PlaneGeometry(RW - .6, 1.1), wallGlowMat, 0, .55, -RD/2 + .045, {cast:false}).userData.noHit = true;
   const loungeFill = new THREE.PointLight(0xffe0c0, .45, 3.2, 2); loungeFill.position.set(0, 1.8, 1.2); scene.add(loungeFill);
 
   /* =========================================================
@@ -907,7 +910,7 @@ window.FLEXKIN_SESSION = {
      neutral in the lounge → sad with the skin concern on the bed →
      eyes closed during care → smiling with glowing skin afterwards.
      ========================================================= */
-  const skin = new THREE.MeshPhysicalMaterial({color:0xf8d9c6, roughness:.6, sheen:new THREE.Color(0x553322), envMapIntensity:.4, clearcoat:0, clearcoatRoughness:.2});
+  const skin = new THREE.MeshPhysicalMaterial({color:0xf6d3bd, roughness:.62, sheen:new THREE.Color(0x3a2418), envMapIntensity:.4, clearcoat:0, clearcoatRoughness:.2});
   const robe = new THREE.MeshPhysicalMaterial({...terrySet, color:0xffffff, sheen:new THREE.Color(0x9a9690), envMapIntensity:.35});
   const robeTrim = new THREE.MeshPhysicalMaterial({...terrySet, color:0xf2eee8, sheen:new THREE.Color(0x9a9690)});
   const dark = new THREE.MeshStandardMaterial({color:0x1a1210, roughness:.3});
@@ -1523,7 +1526,7 @@ window.FLEXKIN_SESSION = {
   controls.addEventListener('start', ()=>{ glide = null; });
 
   /* ---------- lights soften during the session ---------- */
-  const faceLight = new THREE.PointLight(0xfff0dc, 0, 1.4, 2); faceLight.position.set(.3, 1.45, BED_Z - .35); scene.add(faceLight);
+  const faceLight = new THREE.PointLight(0xffd8b0, 0, 1.8, 2); faceLight.position.set(.95, 1.25, BED_Z - .2); scene.add(faceLight);
   const coveBase = coveLights.map(l=>l.intensity);
   let calm = 0;
 
@@ -1689,7 +1692,7 @@ window.FLEXKIN_SESSION = {
     calm += (want - calm) * Math.min(1, dt * (reduce ? 10 : .6));
     renderer.toneMappingExposure = 1.08 - calm * .16;
     coveLights.forEach((l, i)=>l.intensity = coveBase[i] * (1 - calm * .45));
-    faceLight.intensity = (session && !session.finale ? calm : 0) * 1.1;
+    faceLight.intensity = (session && !session.finale ? calm : 0) * .35;
     if (glide){
       const k = 1 - Math.exp(-dt * .9);
       camera.position.lerp(glide.pos, k); controls.target.lerp(glide.target, k);
@@ -1776,7 +1779,7 @@ window.FLEXKIN_SESSION = {
   const moods = { warm:0xffc98a, white:0xf4f1ff, rose:0xf2a9b8 };
   let current = new THREE.Color(moods.warm), targetC = current.clone();
   function applyMood(c){
-    glowMat.color.copy(c); washMat.color.copy(c); floorGlowMat.color.copy(c);
+    glowMat.color.copy(c); washMat.color.copy(c); floorGlowMat.color.copy(c); wallGlowMat.color.copy(c);
     logoLight.color.copy(c); screenLight.color.copy(c); coveLights.forEach(l=>l.color.copy(c));
     ledMats.forEach(m=>m.color.copy(c).multiplyScalar(m.userData.k));
   }
